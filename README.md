@@ -20,11 +20,9 @@
  ├ 오버레이 서비스 (WindowManager)
  ├ 앱 감지 (UsageStatsManager) + 대상 앱 화이트리스트
  ├ 화면 캡처 → shorts_classifier.tflite      숏폼 판별
- ├ 반려동물 사진 → ML Kit Segmentation
- │                → pet_classifier.tflite     종·털길이
- │                → 팔레트 분석               털색
- │                → 이름 테이블               이름 추천
- ├ 픽셀화 (Bitmap 연산)
+ ├ 반려동물 사진 → ML Kit Image Labeling      유효성 판별 (Dog/Cat)
+ │                → ML Kit Segmentation        배경 제거
+ │                → 픽셀화                     색은 원본 사진에서 그대로
  └ Room  ─ 사용 로그·코인·캐릭터 성장 (진실의 원천)
 
 [서버 / 선택]  ─ 없어도 앱이 완전히 동작한다
@@ -46,7 +44,7 @@
 | 디렉터리 | 내용 | 착륙지 |
 |---|---|---|
 | `shorts_classifier/` | 숏폼 화면 판별 (MobileNetV3 → TFLite) | FE |
-| `pet_classifier/` | 종·털길이 분류 + 색 추출 + 이름 추천 | FE |
+| `pet_validation/` | 사진 유효성 판별 명세 (ML Kit, 학습 없음) | FE |
 | `pixelart/` | 반려동물 사진 → 픽셀 캐릭터 변환 | FE (Kotlin 이식) |
 | `experiments/` | VLM 베이스라인 — **제품 경로 아님** | 비교용 |
 
@@ -68,7 +66,7 @@
 그 화면을 촬영한다. 분류기가 학습하는 건 영상 내용이 아니라 UI 배치(오른쪽 세로 버튼 열,
 하단 캡션 바)라서 자체 콘텐츠로 바꿔도 정확도 손실이 없다.
 
-반려동물 사진은 팀·지인 것으로 모은다. 촬영자 동의만 받으면 저작권 쟁점이 없다.
+반려동물 사진은 학습에 쓰지 않는다. ML Kit 이 유효성 판별을 하므로 데이터셋이 필요 없다.
 
 `datasets/` 는 **절대 커밋하지 마라.** `.gitignore` 처리돼 있다.
 
@@ -108,9 +106,10 @@ foregroundPackage in TARGET_PACKAGES  →  캡처 진행
 
 ```
 gh release create v0.1.0 shorts_classifier/build/shorts_classifier.tflite \
-                         pet_classifier/build/pet_classifier.tflite \
-  --title "모델 v0.1.0" --notes "숏폼 정밀도 xx% / 종 판별 정확도 xx%"
+  --title "모델 v0.1.0" --notes "숏폼 정밀도 xx%, 재현율 xx%"
 ```
+
+**학습해서 배포하는 모델은 숏폼 분류기 하나뿐이다.** 반려동물 쪽은 ML Kit 이 전부 처리한다.
 
 FE 는 릴리스에서 받아 `app/src/main/assets/` 에 넣는다.
 
@@ -125,7 +124,7 @@ FE 는 릴리스에서 받아 `app/src/main/assets/` 에 넣는다.
 | 백그라운드 MediaProjection 유지 | 미검증 |
 | 상시 녹화 표시등 UX | 미검증 |
 | 숏폼 분류기 정확도 | 데이터 수집 전 |
-| 반려동물 분류기 정확도 | 데이터 수집 전 |
+| 반려동물 유효성 판별 임계값 | 미조정 |
 | 픽셀화 파이프라인 | 미검증 |
 
 ## 배포 체크리스트
