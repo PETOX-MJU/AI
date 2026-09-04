@@ -1,0 +1,4 @@
+pillow
+numpy
+# 배경 제거 프로토타입용. 앱에서는 ML Kit Subject Segmentation 이 이 역할을 한다.
+rembg

@@ -1,0 +1,5 @@
+torch>=2.4
+transformers>=4.45
+accelerate
+pillow
+openai>=1.40

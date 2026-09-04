@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+__MACOSX/
+
+# Claude Code
+.claude/worktrees/
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.ipynb_checkpoints/
+
+# 데이터셋 — 팀원 폰 스크린샷에 개인정보가 섞이므로 절대 커밋 금지
+datasets/
+experiments/**/data/
+
+# 모델 산출물 — GitHub Releases로 배포한다
+*.tflite
+*.onnx
+*.pt
+*.pth
+*.keras
+*.h5
+runs/
+checkpoints/
+
+# 계획서·제출 문서 — 저장소에 넣지 않는다 (조직 공용 드라이브로 관리)
+*.pdf
+*.docx
+*.hwp
+*.hwpx
+*.pptx
