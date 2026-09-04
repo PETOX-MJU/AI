@@ -3,7 +3,7 @@
 vLLM 의 OpenAI 호환 엔드포인트에 붙는다. 모델을 바꿔도 이 파일과 앱 코드는
 그대로다. 바뀌는 것은 환경변수와 서버에 띄우는 모델뿐이다.
 
-    export PET_VLM_MODEL=kakaocorp/kanana-1.5-v-3b-instruct
+    export PET_VLM_MODEL=Qwen/Qwen2.5-VL-7B-Instruct
     export PET_VLM_BASE_URL=http://localhost:8000/v1
     python client.py samples/dog.jpg
 """
@@ -19,9 +19,29 @@ from pathlib import Path
 from PIL import Image
 
 PROMPT_PATH = Path(__file__).parent / "prompts" / "pet_analysis.txt"
-DEFAULT_MODEL = "kakaocorp/kanana-1.5-v-3b-instruct"  # Apache 2.0
+DEFAULT_MODEL = "Qwen/Qwen2.5-VL-7B-Instruct"  # Apache 2.0 (모델 카드에서 확인)
 DEFAULT_BASE_URL = "http://localhost:8000/v1"
 MAX_SIDE = 896  # 이보다 크게 보내도 분석 품질이 오르지 않는다. 지연만 늘어난다.
+
+# 열거값은 영어로 받고 코드에서 한국어로 옮긴다.
+# 모델의 한국어 능력에 의존하지 않게 되어 라이선스가 깨끗한 모델을 폭넓게 쓸 수 있다.
+KO = {
+    "species": {"dog": "개", "cat": "고양이", "other": "기타"},
+    "color": {
+        "black": "검정", "white": "흰색", "brown": "갈색", "golden": "황금색",
+        "gray": "회색", "cream": "크림색", "orange": "주황색", "mixed": "여러 색",
+    },
+    "coat": {"short": "단모", "long": "장모", "curly": "곱슬"},
+    "pose": {"sitting": "앉음", "standing": "섬", "lying": "엎드림", "other": "기타"},
+}
+
+
+def to_korean(field: str, value: str | None) -> str | None:
+    """모델이 엉뚱한 값을 뱉어도 원문을 그대로 돌려준다. 여기서 예외를 던지면 가입이 막힌다."""
+    if value is None:
+        return None
+    return KO[field].get(value, value)
+
 
 # 앱이 의존하는 계약. 모델이 바뀌어도 이 스키마는 고정이다.
 REQUIRED_KEYS = ("species", "breed", "main_color", "sub_color", "coat", "pose", "face_visible", "suggested_names")
@@ -41,6 +61,19 @@ class PetAnalysis:
     @property
     def is_pet(self) -> bool:
         return self.species is not None
+
+    def localized(self) -> dict:
+        """앱에 내려보낼 한국어 표현. breed 는 모델이 준 영어 품종명을 그대로 둔다."""
+        return {
+            "species": to_korean("species", self.species),
+            "breed": self.breed,
+            "main_color": to_korean("color", self.main_color),
+            "sub_color": to_korean("color", self.sub_color),
+            "coat": to_korean("coat", self.coat),
+            "pose": to_korean("pose", self.pose),
+            "face_visible": self.face_visible,
+            "suggested_names": self.suggested_names,
+        }
 
 
 def encode(image_path: Path) -> str:
@@ -107,7 +140,7 @@ def main() -> None:
         print("반려동물을 찾지 못했습니다. 앱에서는 기본 캐릭터로 폴백하세요.")
         return
 
-    print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
+    print(json.dumps(result.localized(), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

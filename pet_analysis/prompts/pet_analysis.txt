@@ -1,17 +1,18 @@
-이 사진 속 반려동물을 분석해 아래 JSON 형식으로만 답하세요. 다른 설명을 덧붙이지 마세요.
+Analyze the pet in this image. Respond with JSON only. No explanation before or after.
 
 {
-  "species": "개 | 고양이 | 기타",
-  "breed": "품종 추정 (모르면 '알 수 없음')",
-  "main_color": "주된 털색",
-  "sub_color": "보조 털색 (없으면 null)",
-  "coat": "단모 | 장모 | 곱슬",
-  "pose": "앉음 | 섬 | 엎드림 | 기타",
+  "species": "dog | cat | other",
+  "breed": "breed name in English, or 'unknown'",
+  "main_color": "black | white | brown | golden | gray | cream | orange | mixed",
+  "sub_color": "same options as main_color, or null",
+  "coat": "short | long | curly",
+  "pose": "sitting | standing | lying | other",
   "face_visible": true,
-  "suggested_names": ["이름1", "이름2", "이름3"]
+  "suggested_names": ["세 개의 한국어 이름", "털색이나 품종에서 딴", "친근한 이름"]
 }
 
-주의:
-- 반려동물이 없는 사진이면 {"species": null} 만 반환하세요.
-- 여러 마리면 가장 크게 나온 개체 하나만 분석하세요.
-- suggested_names 는 한국어로, 털색이나 품종 특징에서 따온 친근한 이름으로 지으세요.
+Rules:
+- If there is no pet in the image, return {"species": null} and nothing else.
+- If multiple animals, describe only the largest one.
+- Use exactly the enum values listed. Do not invent new ones.
+- suggested_names must be in Korean. Everything else in English.

@@ -5,38 +5,52 @@
 
 ## 모델
 
-**기본: `kakaocorp/kanana-1.5-v-3b-instruct` (카카오, Apache 2.0)**
+**기본: `Qwen/Qwen2.5-VL-7B-Instruct` (Apache 2.0)**
 
-Apache 2.0이라 상업 이용에 아무 조건이 없다. 한국어 네이티브라 프롬프트와 출력이 모두 한국어다.
+모델 카드에서 `License: apache-2.0` 을 직접 확인했다. 상업 이용에 조건이 없다.
 
 | 모델 | 크기 | 라이선스 | 상용 |
 |---|---|---|---|
-| **Kanana 1.5-v-3b** (카카오) | 3B | **Apache 2.0** | ✅ 조건 없음 |
+| **Qwen2.5-VL-7B-Instruct** | 7B | **Apache 2.0** | ✅ 조건 없음 |
+| Kanana 1.5-v-3b (카카오) | 3.6B | `kanana` 자체 라이선스 | ⚠️ **조건 불명 — 문의 필요** |
 | HyperCLOVA X SEED Vision (네이버) | 3B | 자체 라이선스 | ⚠️ 상업 허용, 조건 확인 필요 |
-| Qwen VL 소형 | 3~7B | 모델별로 다름 | ⚠️ 카드 개별 확인 |
-| ~~VARCO-VISION 2.0~~ (NC AI) | 1.7B/14B | CC-BY-NC-4.0 | ❌ 비상업 전용 |
+| VARCO-VISION 2.0 (NC AI) | 1.7B/14B | CC-BY-NC-4.0 | ❌ 비상업 전용 |
 
-> **Qwen 주의**: 2026년 8월 이전에는 오픈웨이트 Qwen이 전부 Apache 2.0이었으나 지금은
-> 모델별로 갈린다. "Qwen은 Apache 2.0"으로 뭉뚱그리지 말고 쓰려는 모델 카드를 직접 확인하라.
->
-> 라이선스는 바뀐다. **배포 직전에 한 번 더 확인하라.**
+### 라이선스 확인 시 주의
+
+**보도자료를 믿지 말고 모델 카드를 직접 열어라.** 실제로 겪은 사례:
+
+- 카카오 보도자료에는 "Kanana에 Apache 2.0 적용"이라고 나오지만, 그건 **텍스트 LLM 기준**이다.
+  VLM 변형인 `kanana-1.5-v-3b-instruct` 의 모델 카드에는 `License: kanana` 라고 적혀 있고
+  상업 이용 조건이 명시되어 있지 않다. 쓰려면 카카오에 직접 문의해야 한다 (kanana-mllm@kakaocorp.com).
+- Kanana-2 는 4종 모두 **텍스트 전용**이다. 비전 변형이 없다.
+- Qwen 은 2026년 8월까지 오픈웨이트 전부 Apache 2.0 이었으나 지금은 모델별로 갈린다.
+
+**같은 제품군 안에서도 변형마다 라이선스가 다르다. 배포 직전에 쓰려는 그 모델의 카드를 확인하라.**
+
+## 한국어 처리
+
+열거값(species, color, coat, pose)은 **영어로 받고 `client.py` 에서 한국어로 옮긴다.**
+모델의 한국어 능력에 의존하지 않으므로 라이선스가 깨끗한 모델을 폭넓게 쓸 수 있다.
+
+한국어가 필요한 건 `suggested_names` 뿐이고, 품질이 부족하면 텍스트 LLM 이나
+털색·품종 기반 이름 테이블로 대체하면 된다.
 
 ## 모델 교체 방법
 
 `client.py` 는 vLLM 의 OpenAI 호환 엔드포인트에 붙는다. 교체는 환경변수 두 개다.
 
 ```
-export PET_VLM_MODEL=kakaocorp/kanana-1.5-v-3b-instruct
+export PET_VLM_MODEL=Qwen/Qwen2.5-VL-7B-Instruct
 export PET_VLM_BASE_URL=http://localhost:8000/v1
 ```
 
 앱과 BE 는 `PetAnalysis` 스키마에만 의존한다. 모델이 바뀌어도 그쪽 코드는 손대지 않는다.
-바뀔 수 있는 건 프롬프트 미세조정뿐이다.
 
 ## 사용
 
 ```
-vllm serve kakaocorp/kanana-1.5-v-3b-instruct --port 8000
+vllm serve Qwen/Qwen2.5-VL-7B-Instruct --port 8000
 python client.py samples/dog.jpg
 ```
 
@@ -45,8 +59,8 @@ python client.py samples/dog.jpg
 ```json
 {
   "species": "개",
-  "breed": "웰시코기",
-  "main_color": "갈색",
+  "breed": "Welsh Corgi",
+  "main_color": "황금색",
   "sub_color": "흰색",
   "coat": "단모",
   "pose": "앉음",
