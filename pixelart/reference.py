@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
 
 @dataclass
@@ -24,8 +24,14 @@ class Params:
     pixel_size: int = 48      # 긴 변 기준 픽셀 격자 해상도
     colors: int = 16          # 팔레트 색 수
     outline: bool = True      # 캐릭터 외곽선
-    outline_rgb: tuple = (30, 30, 40)
+    outline_dark: tuple = (30, 30, 40)    # 밝은 피사체용
+    outline_light: tuple = (235, 232, 228)  # 어두운 피사체용
     preview_scale: int = 8    # 미리보기 확대 배율
+
+
+def load_upright(path: Path) -> Image.Image:
+    """폰 사진은 EXIF 회전 정보를 갖는다. 적용하지 않으면 캐릭터가 옆으로 눕는다."""
+    return ImageOps.exif_transpose(Image.open(path)).convert("RGBA")
 
 
 def remove_background(image: Image.Image) -> Image.Image:
@@ -72,6 +78,21 @@ def quantize_palette(image: Image.Image, colors: int) -> Image.Image:
     return result
 
 
+def pick_outline(image: Image.Image, params: "Params") -> tuple:
+    """어두운 동물에 어두운 테두리를 두르면 실루엣으로 뭉개진다.
+
+    검은 고양이·장모 흑견에서 실제로 재현되는 실패라 피사체 밝기로 테두리 색을 뒤집는다.
+    """
+    arr = np.array(image)
+    opaque = arr[:, :, 3] > 128
+    if not opaque.any():
+        return params.outline_dark
+
+    rgb = arr[:, :, :3][opaque].astype(np.float32)
+    luminance = (0.299 * rgb[:, 0] + 0.587 * rgb[:, 1] + 0.114 * rgb[:, 2]).mean()
+    return params.outline_light if luminance < 90 else params.outline_dark
+
+
 def add_outline(image: Image.Image, rgb: tuple) -> Image.Image:
     """불투명 픽셀의 바깥 경계에 1px 테두리를 두른다. 캐릭터가 배경에서 떠 보이게 한다."""
     arr = np.array(image)
@@ -87,13 +108,13 @@ def add_outline(image: Image.Image, rgb: tuple) -> Image.Image:
 
 
 def convert(path: Path, params: Params) -> Image.Image:
-    image = Image.open(path).convert("RGBA")
+    image = load_upright(path)
     image = remove_background(image)
     image = crop_to_subject(image)
     image = downsample(image, params.pixel_size)
     image = quantize_palette(image, params.colors)
     if params.outline:
-        image = add_outline(image, params.outline_rgb)
+        image = add_outline(image, pick_outline(image, params))
     return image
 
 

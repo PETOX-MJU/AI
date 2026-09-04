@@ -34,3 +34,8 @@ checkpoints/
 *.hwp
 *.hwpx
 *.pptx
+
+# 픽셀화 생성물 (입력 테스트 이미지는 커밋한다)
+pixelart/samples/*_pixel.png
+pixelart/samples/*_preview.png
+pixelart/samples/dog_32px_8c*.png
