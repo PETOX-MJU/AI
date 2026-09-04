@@ -53,3 +53,11 @@ python run.py --prompt prompts/v2.txt
 - transformers 클래스/버전 요구사항은 모델 카드를 확인하세요:
   https://huggingface.co/NCSOFT/VARCO-VISION-2.0-1.7B
 - VARCO-VISION 2.0은 CC-BY-NC-4.0 (비상업) 라이선스입니다
+
+## 상용 배포 시
+
+**이 디렉터리의 VARCO는 평가·비교 용도 전용이다. 제품에 탑재하지 않는다.**
+CC-BY-NC-4.0(비상업)이라 상용 배포 경로에 들어가면 안 된다.
+
+실제 판별은 `../../shorts_classifier/` 의 온디바이스 CNN 이 담당하고,
+반려동물 사진 분석은 `../../pet_analysis/` 의 Kanana(Apache 2.0)를 쓴다.
