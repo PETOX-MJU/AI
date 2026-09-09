@@ -1,0 +1,324 @@
+{
+  "aggregates": [
+    {
+      "anchor_date": "2026-09-07",
+      "apps": null,
+      "end_ms": 1788793200000,
+      "kind": "daily",
+      "measurement_version": "m1",
+      "observed_until_ms": 1788706800000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1788706800000
+    },
+    {
+      "anchor_date": "2026-09-07",
+      "apps": null,
+      "end_ms": 1788793200000,
+      "kind": "pre_bed",
+      "measurement_version": "m1",
+      "observed_until_ms": 1788791400000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1788791400000
+    },
+    {
+      "anchor_date": "2026-09-07",
+      "apps": null,
+      "end_ms": 1788818400000,
+      "kind": "after_bed",
+      "measurement_version": "m1",
+      "observed_until_ms": 1788793200000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1788793200000
+    },
+    {
+      "anchor_date": "2026-09-08",
+      "apps": null,
+      "end_ms": 1788879600000,
+      "kind": "daily",
+      "measurement_version": "m1",
+      "observed_until_ms": 1788793200000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1788793200000
+    },
+    {
+      "anchor_date": "2026-09-08",
+      "apps": null,
+      "end_ms": 1788879600000,
+      "kind": "pre_bed",
+      "measurement_version": "m1",
+      "observed_until_ms": 1788877800000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1788877800000
+    },
+    {
+      "anchor_date": "2026-09-08",
+      "apps": null,
+      "end_ms": 1788904800000,
+      "kind": "after_bed",
+      "measurement_version": "m1",
+      "observed_until_ms": 1788879600000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1788879600000
+    },
+    {
+      "anchor_date": "2026-09-09",
+      "apps": null,
+      "end_ms": 1788966000000,
+      "kind": "daily",
+      "measurement_version": "m1",
+      "observed_until_ms": 1788879600000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1788879600000
+    },
+    {
+      "anchor_date": "2026-09-09",
+      "apps": null,
+      "end_ms": 1788966000000,
+      "kind": "pre_bed",
+      "measurement_version": "m1",
+      "observed_until_ms": 1788964200000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1788964200000
+    },
+    {
+      "anchor_date": "2026-09-09",
+      "apps": null,
+      "end_ms": 1788991200000,
+      "kind": "after_bed",
+      "measurement_version": "m1",
+      "observed_until_ms": 1788966000000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1788966000000
+    },
+    {
+      "anchor_date": "2026-09-10",
+      "apps": null,
+      "end_ms": 1789052400000,
+      "kind": "daily",
+      "measurement_version": "m1",
+      "observed_until_ms": 1788966000000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1788966000000
+    },
+    {
+      "anchor_date": "2026-09-10",
+      "apps": null,
+      "end_ms": 1789052400000,
+      "kind": "pre_bed",
+      "measurement_version": "m1",
+      "observed_until_ms": 1789050600000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1789050600000
+    },
+    {
+      "anchor_date": "2026-09-10",
+      "apps": null,
+      "end_ms": 1789077600000,
+      "kind": "after_bed",
+      "measurement_version": "m1",
+      "observed_until_ms": 1789052400000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1789052400000
+    },
+    {
+      "anchor_date": "2026-09-11",
+      "apps": null,
+      "end_ms": 1789138800000,
+      "kind": "daily",
+      "measurement_version": "m1",
+      "observed_until_ms": 1789052400000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1789052400000
+    },
+    {
+      "anchor_date": "2026-09-11",
+      "apps": null,
+      "end_ms": 1789138800000,
+      "kind": "pre_bed",
+      "measurement_version": "m1",
+      "observed_until_ms": 1789137000000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1789137000000
+    },
+    {
+      "anchor_date": "2026-09-11",
+      "apps": null,
+      "end_ms": 1789164000000,
+      "kind": "after_bed",
+      "measurement_version": "m1",
+      "observed_until_ms": 1789138800000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1789138800000
+    },
+    {
+      "anchor_date": "2026-09-12",
+      "apps": null,
+      "end_ms": 1789225200000,
+      "kind": "daily",
+      "measurement_version": "m1",
+      "observed_until_ms": 1789138800000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1789138800000
+    },
+    {
+      "anchor_date": "2026-09-12",
+      "apps": null,
+      "end_ms": 1789225200000,
+      "kind": "pre_bed",
+      "measurement_version": "m1",
+      "observed_until_ms": 1789223400000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1789223400000
+    },
+    {
+      "anchor_date": "2026-09-12",
+      "apps": null,
+      "end_ms": 1789250400000,
+      "kind": "after_bed",
+      "measurement_version": "m1",
+      "observed_until_ms": 1789225200000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1789225200000
+    },
+    {
+      "anchor_date": "2026-09-13",
+      "apps": null,
+      "end_ms": 1789311600000,
+      "kind": "daily",
+      "measurement_version": "m1",
+      "observed_until_ms": 1789225200000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1789225200000
+    },
+    {
+      "anchor_date": "2026-09-13",
+      "apps": null,
+      "end_ms": 1789311600000,
+      "kind": "pre_bed",
+      "measurement_version": "m1",
+      "observed_until_ms": 1789309800000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1789309800000
+    },
+    {
+      "anchor_date": "2026-09-13",
+      "apps": null,
+      "end_ms": 1789336800000,
+      "kind": "after_bed",
+      "measurement_version": "m1",
+      "observed_until_ms": 1789311600000,
+      "profile_version": 1,
+      "quality": "unavailable",
+      "reason_codes": [
+        "QUERY_FAILED"
+      ],
+      "start_ms": 1789311600000
+    }
+  ],
+  "as_of_ms": 1789340400000,
+  "current_daily_target_ms": null,
+  "current_night_target_ms": null,
+  "last_collection_attempt_ms": 1789340400000,
+  "missions": [],
+  "profile": {
+    "effective_from": "2026-09-07",
+    "final_daily_ms": 3600000,
+    "final_night_ms": 0,
+    "purposes": {
+      "com.example.video": "여가"
+    },
+    "target_packages": [
+      "com.example.video"
+    ],
+    "temporary_daily_ms": 7200000,
+    "temporary_night_ms": 1800000,
+    "timezone": "Asia/Seoul",
+    "version": 1,
+    "weekday_bed": "00:00",
+    "weekday_wake": "07:00",
+    "weekend_bed": "00:00",
+    "weekend_wake": "07:00"
+  },
+  "schema_version": "1",
+  "week_start": "2026-09-07"
+}

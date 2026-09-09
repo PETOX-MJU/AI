@@ -1,0 +1,151 @@
+{
+  "insights": [
+    {
+      "code": "NIGHT_TOP_APP",
+      "evidence": {
+        "night_share_pct": 100.0,
+        "night_total_ms": 12600000,
+        "package_name": "com.example.video"
+      },
+      "source": "template",
+      "text": "야간 구간에서 가장 많이 사용한 앱은 com.example.video이고 210분입니다. 야간 사용의 100.0%입니다. 이 앱의 사용 목적은 '여가'로 설정되어 있습니다."
+    }
+  ],
+  "metrics": {
+    "after_bed_total_ms": 4200000,
+    "all_apps_total_ms": 67200000,
+    "comparison": {
+      "all_apps_delta_ms": null,
+      "comparable": false,
+      "reason": "NO_PREVIOUS_WEEK_DATA",
+      "selected_delta_ms": null,
+      "selected_delta_pct": null
+    },
+    "daily_evaluable_count": 0,
+    "daily_success_count": 0,
+    "night_evaluable_count": 0,
+    "night_success_count": 0,
+    "per_app": [
+      {
+        "delta_ms": null,
+        "delta_pct": null,
+        "is_target": false,
+        "night_share_pct": null,
+        "night_total_ms": null,
+        "package_name": "com.example.chat",
+        "share_pct": 25.0,
+        "total_ms": 16800000
+      },
+      {
+        "delta_ms": null,
+        "delta_pct": null,
+        "is_target": true,
+        "night_share_pct": 100.0,
+        "night_total_ms": 12600000,
+        "package_name": "com.example.video",
+        "share_pct": 75.0,
+        "total_ms": 50400000
+      }
+    ],
+    "per_day": [
+      {
+        "after_bed_ms": 600000,
+        "after_bed_quality": "complete",
+        "all_apps_ms": 9600000,
+        "daily_quality": "complete",
+        "date": "2026-09-07",
+        "pre_bed_ms": 1200000,
+        "pre_bed_quality": "complete",
+        "selected_ms": 7200000
+      },
+      {
+        "after_bed_ms": 600000,
+        "after_bed_quality": "complete",
+        "all_apps_ms": 9600000,
+        "daily_quality": "complete",
+        "date": "2026-09-08",
+        "pre_bed_ms": 1200000,
+        "pre_bed_quality": "complete",
+        "selected_ms": 7200000
+      },
+      {
+        "after_bed_ms": 600000,
+        "after_bed_quality": "complete",
+        "all_apps_ms": 9600000,
+        "daily_quality": "complete",
+        "date": "2026-09-09",
+        "pre_bed_ms": 1200000,
+        "pre_bed_quality": "complete",
+        "selected_ms": 7200000
+      },
+      {
+        "after_bed_ms": 600000,
+        "after_bed_quality": "complete",
+        "all_apps_ms": 9600000,
+        "daily_quality": "complete",
+        "date": "2026-09-10",
+        "pre_bed_ms": 1200000,
+        "pre_bed_quality": "complete",
+        "selected_ms": 7200000
+      },
+      {
+        "after_bed_ms": 600000,
+        "after_bed_quality": "complete",
+        "all_apps_ms": 9600000,
+        "daily_quality": "complete",
+        "date": "2026-09-11",
+        "pre_bed_ms": 1200000,
+        "pre_bed_quality": "complete",
+        "selected_ms": 7200000
+      },
+      {
+        "after_bed_ms": 600000,
+        "after_bed_quality": "complete",
+        "all_apps_ms": 9600000,
+        "daily_quality": "complete",
+        "date": "2026-09-12",
+        "pre_bed_ms": 1200000,
+        "pre_bed_quality": "complete",
+        "selected_ms": 7200000
+      },
+      {
+        "after_bed_ms": 600000,
+        "after_bed_quality": "complete",
+        "all_apps_ms": 9600000,
+        "daily_quality": "complete",
+        "date": "2026-09-13",
+        "pre_bed_ms": 1200000,
+        "pre_bed_quality": "complete",
+        "selected_ms": 7200000
+      }
+    ],
+    "pre_bed_total_ms": 8400000,
+    "selected_daily_mean_ms": 7200000.0,
+    "selected_night_mean_ms": 1800000.0,
+    "selected_total_ms": 50400000,
+    "valid_days": 7,
+    "valid_nights": 7
+  },
+  "mission_results": [],
+  "proposals": [
+    {
+      "basis_week": "2026-09-07",
+      "kind": "daily",
+      "profile_version": 1,
+      "reason_code": "INITIAL_BASELINE",
+      "rules_version": "2026-09-10.1",
+      "target_ms": 6480000
+    },
+    {
+      "basis_week": "2026-09-07",
+      "kind": "night",
+      "profile_version": 1,
+      "reason_code": "INITIAL_BASELINE",
+      "rules_version": "2026-09-10.1",
+      "target_ms": 1620000
+    }
+  ],
+  "rules_version": "2026-09-10.1",
+  "schema_version": "1",
+  "week_status": "ready"
+}

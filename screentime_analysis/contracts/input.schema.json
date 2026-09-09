@@ -1,0 +1,366 @@
+{
+  "$defs": {
+    "AppDuration": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_ms": {
+          "ge": 0,
+          "le": 9007199254740991,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "package_name": {
+          "minLength": 1,
+          "title": "Package Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_name",
+        "duration_ms"
+      ],
+      "title": "AppDuration",
+      "type": "object"
+    },
+    "Mission": {
+      "additionalProperties": false,
+      "description": "실제로 발급된 미션 스냅샷. 현재 설정으로 과거를 재평가하지 않는다.",
+      "properties": {
+        "accepted_at_ms": {
+          "ge": 946684800000,
+          "le": 4102444800000,
+          "title": "Accepted At Ms",
+          "type": "integer"
+        },
+        "anchor_date": {
+          "format": "date",
+          "title": "Anchor Date",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "daily",
+            "night"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "profile_version": {
+          "ge": 0,
+          "title": "Profile Version",
+          "type": "integer"
+        },
+        "target_ms": {
+          "ge": 0,
+          "le": 9007199254740991,
+          "title": "Target Ms",
+          "type": "integer"
+        },
+        "window_end_ms": {
+          "ge": 946684800000,
+          "le": 4102444800000,
+          "title": "Window End Ms",
+          "type": "integer"
+        },
+        "window_start_ms": {
+          "ge": 946684800000,
+          "le": 4102444800000,
+          "title": "Window Start Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "anchor_date",
+        "kind",
+        "target_ms",
+        "profile_version",
+        "accepted_at_ms",
+        "window_start_ms",
+        "window_end_ms"
+      ],
+      "title": "Mission",
+      "type": "object"
+    },
+    "Profile": {
+      "additionalProperties": false,
+      "description": "사용자 설정 스냅샷. 목표 입력은 분 단위 정수다.",
+      "properties": {
+        "effective_from": {
+          "format": "date",
+          "title": "Effective From",
+          "type": "string"
+        },
+        "final_daily_ms": {
+          "ge": 0,
+          "le": 9007199254740991,
+          "title": "Final Daily Ms",
+          "type": "integer"
+        },
+        "final_night_ms": {
+          "ge": 0,
+          "le": 9007199254740991,
+          "title": "Final Night Ms",
+          "type": "integer"
+        },
+        "purposes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Purposes",
+          "type": "object"
+        },
+        "target_packages": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Target Packages",
+          "type": "array"
+        },
+        "temporary_daily_ms": {
+          "ge": 0,
+          "le": 9007199254740991,
+          "title": "Temporary Daily Ms",
+          "type": "integer"
+        },
+        "temporary_night_ms": {
+          "ge": 0,
+          "le": 9007199254740991,
+          "title": "Temporary Night Ms",
+          "type": "integer"
+        },
+        "timezone": {
+          "minLength": 1,
+          "title": "Timezone",
+          "type": "string"
+        },
+        "version": {
+          "ge": 0,
+          "title": "Version",
+          "type": "integer"
+        },
+        "weekday_bed": {
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+          "title": "Weekday Bed",
+          "type": "string"
+        },
+        "weekday_wake": {
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+          "title": "Weekday Wake",
+          "type": "string"
+        },
+        "weekend_bed": {
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+          "title": "Weekend Bed",
+          "type": "string"
+        },
+        "weekend_wake": {
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+          "title": "Weekend Wake",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "timezone",
+        "target_packages",
+        "weekday_bed",
+        "weekday_wake",
+        "weekend_bed",
+        "weekend_wake",
+        "temporary_daily_ms",
+        "temporary_night_ms",
+        "final_daily_ms",
+        "final_night_ms",
+        "effective_from"
+      ],
+      "title": "Profile",
+      "type": "object"
+    },
+    "WindowAggregate": {
+      "additionalProperties": false,
+      "description": "FE가 정규화한 한 구간의 앱별 집계.",
+      "properties": {
+        "anchor_date": {
+          "format": "date",
+          "title": "Anchor Date",
+          "type": "string"
+        },
+        "apps": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/AppDuration"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Apps"
+        },
+        "end_ms": {
+          "ge": 946684800000,
+          "le": 4102444800000,
+          "title": "End Ms",
+          "type": "integer"
+        },
+        "kind": {
+          "enum": [
+            "daily",
+            "pre_bed",
+            "after_bed"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "measurement_version": {
+          "minLength": 1,
+          "title": "Measurement Version",
+          "type": "string"
+        },
+        "observed_until_ms": {
+          "ge": 946684800000,
+          "le": 4102444800000,
+          "title": "Observed Until Ms",
+          "type": "integer"
+        },
+        "profile_version": {
+          "ge": 0,
+          "title": "Profile Version",
+          "type": "integer"
+        },
+        "quality": {
+          "enum": [
+            "complete",
+            "partial",
+            "unavailable"
+          ],
+          "title": "Quality",
+          "type": "string"
+        },
+        "reason_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "start_ms": {
+          "ge": 946684800000,
+          "le": 4102444800000,
+          "title": "Start Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "anchor_date",
+        "kind",
+        "start_ms",
+        "end_ms",
+        "observed_until_ms",
+        "quality",
+        "profile_version",
+        "apps",
+        "measurement_version"
+      ],
+      "title": "WindowAggregate",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "aggregates": {
+      "items": {
+        "$ref": "#/$defs/WindowAggregate"
+      },
+      "title": "Aggregates",
+      "type": "array"
+    },
+    "as_of_ms": {
+      "ge": 946684800000,
+      "le": 4102444800000,
+      "title": "As Of Ms",
+      "type": "integer"
+    },
+    "current_daily_target_ms": {
+      "anyOf": [
+        {
+          "ge": 0,
+          "le": 9007199254740991,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Current Daily Target Ms"
+    },
+    "current_night_target_ms": {
+      "anyOf": [
+        {
+          "ge": 0,
+          "le": 9007199254740991,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Current Night Target Ms"
+    },
+    "last_collection_attempt_ms": {
+      "anyOf": [
+        {
+          "ge": 946684800000,
+          "le": 4102444800000,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Last Collection Attempt Ms"
+    },
+    "missions": {
+      "items": {
+        "$ref": "#/$defs/Mission"
+      },
+      "title": "Missions",
+      "type": "array"
+    },
+    "profile": {
+      "$ref": "#/$defs/Profile"
+    },
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "week_start": {
+      "format": "date",
+      "title": "Week Start",
+      "type": "string"
+    }
+  },
+  "required": [
+    "as_of_ms",
+    "last_collection_attempt_ms",
+    "week_start",
+    "profile",
+    "aggregates",
+    "missions",
+    "current_daily_target_ms",
+    "current_night_target_ms"
+  ],
+  "title": "AnalysisInput",
+  "type": "object"
+}

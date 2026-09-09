@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+
+# 실제 사용 기록은 절대 커밋하지 않는다. 합성 데이터만 둔다.
+real_data/
+*.private.json

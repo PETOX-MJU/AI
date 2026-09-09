@@ -1,0 +1,112 @@
+{
+  "note": "합성 데이터다. Python 구현이 판정의 기준이며 FE 로컬 판정이 같은 결과를 내는지 대조하는 용도다.",
+  "night_windows": [
+    {
+      "id": "F07",
+      "anchor_date": "2026-09-13",
+      "timezone": "Asia/Seoul",
+      "bed": "00:00",
+      "wake": "07:00",
+      "expected_pre_bed": {
+        "start_ms": 1789309800000,
+        "end_ms": 1789311600000
+      },
+      "expected_after_bed": {
+        "start_ms": 1789311600000,
+        "end_ms": 1789336800000
+      },
+      "expected_local": {
+        "pre_start": "2026-09-13T23:30:00+09:00",
+        "after_end": "2026-09-14T07:00:00+09:00"
+      }
+    }
+  ],
+  "daily_window_dst": [
+    {
+      "id": "F21",
+      "timezone": "America/New_York",
+      "date": "2026-03-08",
+      "expected_duration_ms": 82800000
+    },
+    {
+      "id": "F21",
+      "timezone": "America/New_York",
+      "date": "2026-11-01",
+      "expected_duration_ms": 90000000
+    }
+  ],
+  "reduce_target": [
+    {
+      "reference_ms": 7200000,
+      "final_goal_ms": 3600000,
+      "expected_ms": 6480000
+    },
+    {
+      "id": "F18",
+      "reference_ms": 3900000,
+      "final_goal_ms": 3600000,
+      "expected_ms": 3600000
+    },
+    {
+      "reference_ms": 60000,
+      "final_goal_ms": 0,
+      "expected_ms": 60000
+    },
+    {
+      "id": "F17",
+      "reference_ms": 3600000,
+      "final_goal_ms": 3600000,
+      "expected_ms": 3600000
+    }
+  ],
+  "mission_judgement": [
+    {
+      "id": "F02",
+      "target_ms": 1620000,
+      "observed_ms": 1620000,
+      "quality": "complete",
+      "window_closed": true,
+      "expected": "succeeded"
+    },
+    {
+      "id": "F03",
+      "target_ms": 1620000,
+      "observed_ms": 1620001,
+      "quality": "complete",
+      "window_closed": true,
+      "expected": "failed"
+    },
+    {
+      "id": "F04",
+      "target_ms": 1620000,
+      "observed_ms": null,
+      "quality": "unavailable",
+      "window_closed": true,
+      "expected": "unknown"
+    },
+    {
+      "id": "F05",
+      "target_ms": 1620000,
+      "observed_ms": 0,
+      "quality": "complete",
+      "window_closed": true,
+      "expected": "succeeded"
+    },
+    {
+      "target_ms": 1620000,
+      "observed_ms": 5940000,
+      "quality": "complete",
+      "window_closed": false,
+      "expected": "in_progress"
+    },
+    {
+      "id": "F16",
+      "target_ms": 1620000,
+      "observed_ms": 0,
+      "quality": "complete",
+      "window_closed": true,
+      "accepted_after_window_start": true,
+      "expected": "not_applicable"
+    }
+  ]
+}

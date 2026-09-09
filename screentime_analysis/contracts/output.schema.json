@@ -1,0 +1,613 @@
+{
+  "$defs": {
+    "AppMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "delta_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Delta Ms"
+        },
+        "delta_pct": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Delta Pct"
+        },
+        "is_target": {
+          "title": "Is Target",
+          "type": "boolean"
+        },
+        "night_share_pct": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Night Share Pct"
+        },
+        "night_total_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Night Total Ms"
+        },
+        "package_name": {
+          "title": "Package Name",
+          "type": "string"
+        },
+        "share_pct": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Share Pct"
+        },
+        "total_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Total Ms"
+        }
+      },
+      "required": [
+        "package_name",
+        "is_target",
+        "total_ms",
+        "share_pct",
+        "night_total_ms",
+        "night_share_pct",
+        "delta_ms",
+        "delta_pct"
+      ],
+      "title": "AppMetrics",
+      "type": "object"
+    },
+    "Comparison": {
+      "additionalProperties": false,
+      "properties": {
+        "all_apps_delta_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "All Apps Delta Ms"
+        },
+        "comparable": {
+          "title": "Comparable",
+          "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "selected_delta_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Selected Delta Ms"
+        },
+        "selected_delta_pct": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Selected Delta Pct"
+        }
+      },
+      "required": [
+        "comparable",
+        "reason",
+        "selected_delta_ms",
+        "selected_delta_pct",
+        "all_apps_delta_ms"
+      ],
+      "title": "Comparison",
+      "type": "object"
+    },
+    "DayMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "after_bed_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "After Bed Ms"
+        },
+        "after_bed_quality": {
+          "anyOf": [
+            {
+              "enum": [
+                "complete",
+                "partial",
+                "unavailable"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "After Bed Quality"
+        },
+        "all_apps_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "All Apps Ms"
+        },
+        "daily_quality": {
+          "anyOf": [
+            {
+              "enum": [
+                "complete",
+                "partial",
+                "unavailable"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Daily Quality"
+        },
+        "date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "pre_bed_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pre Bed Ms"
+        },
+        "pre_bed_quality": {
+          "anyOf": [
+            {
+              "enum": [
+                "complete",
+                "partial",
+                "unavailable"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pre Bed Quality"
+        },
+        "selected_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Selected Ms"
+        }
+      },
+      "required": [
+        "date",
+        "daily_quality",
+        "pre_bed_quality",
+        "after_bed_quality",
+        "all_apps_ms",
+        "selected_ms",
+        "pre_bed_ms",
+        "after_bed_ms"
+      ],
+      "title": "DayMetrics",
+      "type": "object"
+    },
+    "Insight": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Evidence",
+          "type": "object"
+        },
+        "source": {
+          "const": "template",
+          "default": "template",
+          "title": "Source",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "evidence",
+        "text"
+      ],
+      "title": "Insight",
+      "type": "object"
+    },
+    "MissionResult": {
+      "additionalProperties": false,
+      "properties": {
+        "evaluated_at_ms": {
+          "ge": 946684800000,
+          "le": 4102444800000,
+          "title": "Evaluated At Ms",
+          "type": "integer"
+        },
+        "mission_id": {
+          "title": "Mission Id",
+          "type": "string"
+        },
+        "observed_ms": {
+          "anyOf": [
+            {
+              "ge": 0,
+              "le": 9007199254740991,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Observed Ms"
+        },
+        "status": {
+          "enum": [
+            "in_progress",
+            "succeeded",
+            "failed",
+            "unknown",
+            "not_applicable"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mission_id",
+        "status",
+        "observed_ms",
+        "evaluated_at_ms"
+      ],
+      "title": "MissionResult",
+      "type": "object"
+    },
+    "Proposal": {
+      "additionalProperties": false,
+      "description": "추천이며 활성 미션이 아니다. 수락·저장은 BE 책임이다.",
+      "properties": {
+        "basis_week": {
+          "format": "date",
+          "title": "Basis Week",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "daily",
+            "night"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "profile_version": {
+          "ge": 0,
+          "title": "Profile Version",
+          "type": "integer"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "rules_version": {
+          "title": "Rules Version",
+          "type": "string"
+        },
+        "target_ms": {
+          "anyOf": [
+            {
+              "ge": 0,
+              "le": 9007199254740991,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Target Ms"
+        }
+      },
+      "required": [
+        "kind",
+        "target_ms",
+        "reason_code",
+        "basis_week",
+        "profile_version",
+        "rules_version"
+      ],
+      "title": "Proposal",
+      "type": "object"
+    },
+    "WeeklyMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "after_bed_total_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "After Bed Total Ms"
+        },
+        "all_apps_total_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "All Apps Total Ms"
+        },
+        "comparison": {
+          "$ref": "#/$defs/Comparison"
+        },
+        "daily_evaluable_count": {
+          "ge": 0,
+          "title": "Daily Evaluable Count",
+          "type": "integer"
+        },
+        "daily_success_count": {
+          "ge": 0,
+          "title": "Daily Success Count",
+          "type": "integer"
+        },
+        "night_evaluable_count": {
+          "ge": 0,
+          "title": "Night Evaluable Count",
+          "type": "integer"
+        },
+        "night_success_count": {
+          "ge": 0,
+          "title": "Night Success Count",
+          "type": "integer"
+        },
+        "per_app": {
+          "items": {
+            "$ref": "#/$defs/AppMetrics"
+          },
+          "title": "Per App",
+          "type": "array"
+        },
+        "per_day": {
+          "items": {
+            "$ref": "#/$defs/DayMetrics"
+          },
+          "title": "Per Day",
+          "type": "array"
+        },
+        "pre_bed_total_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pre Bed Total Ms"
+        },
+        "selected_daily_mean_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Selected Daily Mean Ms"
+        },
+        "selected_night_mean_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Selected Night Mean Ms"
+        },
+        "selected_total_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Selected Total Ms"
+        },
+        "valid_days": {
+          "ge": 0,
+          "title": "Valid Days",
+          "type": "integer"
+        },
+        "valid_nights": {
+          "ge": 0,
+          "title": "Valid Nights",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "valid_days",
+        "valid_nights",
+        "all_apps_total_ms",
+        "selected_total_ms",
+        "selected_daily_mean_ms",
+        "selected_night_mean_ms",
+        "pre_bed_total_ms",
+        "after_bed_total_ms",
+        "daily_success_count",
+        "daily_evaluable_count",
+        "night_success_count",
+        "night_evaluable_count",
+        "per_day",
+        "per_app",
+        "comparison"
+      ],
+      "title": "WeeklyMetrics",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "insights": {
+      "items": {
+        "$ref": "#/$defs/Insight"
+      },
+      "title": "Insights",
+      "type": "array"
+    },
+    "metrics": {
+      "$ref": "#/$defs/WeeklyMetrics"
+    },
+    "mission_results": {
+      "items": {
+        "$ref": "#/$defs/MissionResult"
+      },
+      "title": "Mission Results",
+      "type": "array"
+    },
+    "proposals": {
+      "items": {
+        "$ref": "#/$defs/Proposal"
+      },
+      "title": "Proposals",
+      "type": "array"
+    },
+    "rules_version": {
+      "title": "Rules Version",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "week_status": {
+      "enum": [
+        "in_progress",
+        "awaiting_data",
+        "ready",
+        "insufficient_data"
+      ],
+      "title": "Week Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "week_status",
+    "metrics",
+    "mission_results",
+    "proposals",
+    "insights",
+    "rules_version"
+  ],
+  "title": "AnalysisOutput",
+  "type": "object"
+}

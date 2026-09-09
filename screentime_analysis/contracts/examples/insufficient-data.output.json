@@ -1,0 +1,112 @@
+{
+  "insights": [
+    {
+      "code": "INSUFFICIENT_DATA",
+      "evidence": {
+        "valid_days": 0,
+        "valid_nights": 0
+      },
+      "source": "template",
+      "text": "분석에 사용할 수 있는 날은 0일, 야간 구간은 0개입니다. 각각 7개가 모여야 개인 기준선을 계산합니다. 그때까지는 처음 입력한 임시 목표를 사용합니다."
+    }
+  ],
+  "metrics": {
+    "after_bed_total_ms": null,
+    "all_apps_total_ms": null,
+    "comparison": {
+      "all_apps_delta_ms": null,
+      "comparable": false,
+      "reason": "NO_PREVIOUS_WEEK_DATA",
+      "selected_delta_ms": null,
+      "selected_delta_pct": null
+    },
+    "daily_evaluable_count": 0,
+    "daily_success_count": 0,
+    "night_evaluable_count": 0,
+    "night_success_count": 0,
+    "per_app": [],
+    "per_day": [
+      {
+        "after_bed_ms": null,
+        "after_bed_quality": "unavailable",
+        "all_apps_ms": null,
+        "daily_quality": "unavailable",
+        "date": "2026-09-07",
+        "pre_bed_ms": null,
+        "pre_bed_quality": "unavailable",
+        "selected_ms": null
+      },
+      {
+        "after_bed_ms": null,
+        "after_bed_quality": "unavailable",
+        "all_apps_ms": null,
+        "daily_quality": "unavailable",
+        "date": "2026-09-08",
+        "pre_bed_ms": null,
+        "pre_bed_quality": "unavailable",
+        "selected_ms": null
+      },
+      {
+        "after_bed_ms": null,
+        "after_bed_quality": "unavailable",
+        "all_apps_ms": null,
+        "daily_quality": "unavailable",
+        "date": "2026-09-09",
+        "pre_bed_ms": null,
+        "pre_bed_quality": "unavailable",
+        "selected_ms": null
+      },
+      {
+        "after_bed_ms": null,
+        "after_bed_quality": "unavailable",
+        "all_apps_ms": null,
+        "daily_quality": "unavailable",
+        "date": "2026-09-10",
+        "pre_bed_ms": null,
+        "pre_bed_quality": "unavailable",
+        "selected_ms": null
+      },
+      {
+        "after_bed_ms": null,
+        "after_bed_quality": "unavailable",
+        "all_apps_ms": null,
+        "daily_quality": "unavailable",
+        "date": "2026-09-11",
+        "pre_bed_ms": null,
+        "pre_bed_quality": "unavailable",
+        "selected_ms": null
+      },
+      {
+        "after_bed_ms": null,
+        "after_bed_quality": "unavailable",
+        "all_apps_ms": null,
+        "daily_quality": "unavailable",
+        "date": "2026-09-12",
+        "pre_bed_ms": null,
+        "pre_bed_quality": "unavailable",
+        "selected_ms": null
+      },
+      {
+        "after_bed_ms": null,
+        "after_bed_quality": "unavailable",
+        "all_apps_ms": null,
+        "daily_quality": "unavailable",
+        "date": "2026-09-13",
+        "pre_bed_ms": null,
+        "pre_bed_quality": "unavailable",
+        "selected_ms": null
+      }
+    ],
+    "pre_bed_total_ms": null,
+    "selected_daily_mean_ms": null,
+    "selected_night_mean_ms": null,
+    "selected_total_ms": null,
+    "valid_days": 0,
+    "valid_nights": 0
+  },
+  "mission_results": [],
+  "proposals": [],
+  "rules_version": "2026-09-10.1",
+  "schema_version": "1",
+  "week_status": "insufficient_data"
+}

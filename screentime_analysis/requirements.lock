@@ -1,0 +1,18 @@
+# 실제로 설치·검증한 버전이다. 계획서 13절 명령을 이 조합에서 전부 실행했다.
+#
+# 검증 환경: macOS(darwin arm64), CPython 3.13.9
+# 계획서는 Python 3.12를 명시했으나 이 머신에 3.12가 없어 3.13.9로 검증했다.
+# 패키지 requires-python은 >=3.12이며 3.12 전용 문법·API는 쓰지 않았다.
+# 3.12에서의 실행은 미검증이다.
+
+# --- 런타임 (wheel 설치 시 함께 들어감) ---
+pydantic==2.13.5
+pydantic_core==2.46.5
+annotated-types==0.8.0
+typing_extensions==4.16.0
+typing-inspection==0.4.4
+
+# --- 개발 도구 (테스트·lint·빌드에만 필요) ---
+pytest==8.4.2
+ruff==0.12.0
+build==1.3.0
