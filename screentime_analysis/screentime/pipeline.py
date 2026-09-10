@@ -28,6 +28,7 @@ def analyze(request: AnalysisInput) -> AnalysisOutput:
             request.profile,
             current_daily_target_ms=request.current_daily_target_ms,
             current_night_target_ms=request.current_night_target_ms,
+            basis_week=request.week_start,
         ),
         rules_version=RULES_VERSION,
     )
