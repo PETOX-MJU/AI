@@ -22,12 +22,45 @@ EXIT_OK = 0
 EXIT_INVALID_INPUT = 2
 
 
+def _known_field_names() -> frozenset[str]:
+    """모델이 선언한 필드 이름 집합.
+
+    오류 경로에는 ``profile.purposes.<패키지명>`` 처럼 **사용자가 정한 사전 키**가
+    섞여 들어온다. 선언된 필드 이름이 아닌 조각은 전부 가려야 값이 새지 않는다.
+    """
+    import inspect
+
+    from . import models as models_module
+
+    names: set[str] = set()
+    for _, obj in inspect.getmembers(models_module, inspect.isclass):
+        fields = getattr(obj, "model_fields", None)
+        if fields:
+            names.update(fields)
+    return frozenset(names)
+
+
+_KNOWN_FIELDS = _known_field_names()
+_MASKED = "<key>"
+
+
+def _safe_location(loc: tuple[object, ...]) -> str:
+    parts = []
+    for part in loc:
+        if isinstance(part, int):
+            parts.append(str(part))  # 배열 인덱스는 사용자 값이 아니다
+        elif part in _KNOWN_FIELDS:
+            parts.append(str(part))
+        else:
+            parts.append(_MASKED)
+    return ".".join(parts) or "(root)"
+
+
 def _describe(error: ValidationError) -> str:
     """오류 위치와 유형만 남긴다. 사용자 값은 절대 넣지 않는다."""
     lines = [f"입력 검증 실패: {error.error_count()}건"]
     for item in error.errors(include_url=False):
-        location = ".".join(str(part) for part in item["loc"]) or "(root)"
-        lines.append(f"  - {location}: {item['type']}")
+        lines.append(f"  - {_safe_location(item['loc'])}: {item['type']}")
     return "\n".join(lines)
 
 

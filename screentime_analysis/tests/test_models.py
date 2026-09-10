@@ -263,3 +263,32 @@ def test_too_many_anchor_dates_rejected(seoul_profile):
         aggregates += [make_aggregate(start + dt.timedelta(days=i), "daily", seoul_profile, apps={}) for i in range(7)]
     with pytest.raises(ValidationError, match="anchor date"):
         build_request(seoul_profile, aggregates=aggregates)
+
+
+def test_aggregate_boundaries_must_match_profile(seoul_profile):
+    """구간 경계를 검증하지 않으면 1분짜리 구간에 빈 앱 목록을 넣어
+    하루 전체를 '확인된 0'으로 위조할 수 있다."""
+    aggregates = week_aggregates(
+        WEEK_START, seoul_profile, daily_ms=120 * MINUTE, pre_bed_ms=20 * MINUTE, after_bed_ms=10 * MINUTE
+    )
+    shrunk = []
+    for agg in aggregates:
+        if agg.kind == "daily":
+            end = agg.start_ms + MINUTE
+            agg = agg.model_copy(update={"end_ms": end, "observed_until_ms": end, "apps": []})
+        shrunk.append(agg)
+
+    with pytest.raises(ValidationError, match="프로필로 계산한 경계와 다릅니다"):
+        build_request(seoul_profile, aggregates=shrunk)
+
+
+def test_night_aggregate_boundaries_are_checked(seoul_profile):
+    aggregates = week_aggregates(
+        WEEK_START, seoul_profile, daily_ms=120 * MINUTE, pre_bed_ms=20 * MINUTE, after_bed_ms=10 * MINUTE
+    )
+    shifted = [
+        a.model_copy(update={"start_ms": a.start_ms - MINUTE}) if a.kind == "pre_bed" else a
+        for a in aggregates
+    ]
+    with pytest.raises(ValidationError, match="pre_bed 구간이 프로필로 계산한 경계와 다릅니다"):
+        build_request(seoul_profile, aggregates=shifted)

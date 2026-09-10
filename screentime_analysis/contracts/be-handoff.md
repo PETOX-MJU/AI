@@ -48,9 +48,28 @@ def run_analysis(payload: dict) -> dict:
 | `selected_total_ms: null` | 그 주에 complete 구간이 하나도 없음 |
 | `selected_daily_mean_ms: null` | complete 일수가 7이 아님 |
 | `delta_pct: null` | 분모가 0. `0분 → 20분`은 절대 증가로만 설명 |
+| `per_app[].total_ms: 0` | complete 기록이 있고 그 앱을 쓰지 않음 |
+| `per_app[].total_ms: null` | 그 주에 complete 구간이 없어 알 수 없음 |
 | `target_ms: null` (Proposal) | 기준선이 1분 미만이라 숫자 목표를 만들지 않음 |
 
 **데이터가 없다는 이유로 사용량 0이나 미션 성공을 만들지 않는다.**
+
+## 4-1. 집계 경계는 정확히 일치해야 한다
+
+`aggregates[*].start_ms` / `end_ms`는 **프로필로 계산한 구간과 정확히 같아야 한다.**
+다르면 `ValidationError`다.
+
+```text
+daily     → 로컬 자정 ~ 다음 로컬 자정
+pre_bed   → [취침 - 30분, 취침)
+after_bed → [취침, 기상)
+```
+
+이 검사가 없으면 1분짜리 구간에 빈 앱 목록을 넣어 하루 전체를 '확인된 0분'으로
+위조할 수 있다. FE는 `contracts/fixtures.json`으로 경계 계산을 대조하라.
+
+Mission의 `window_start_ms` / `window_end_ms`는 **검사하지 않는다.** 발급 당시
+프로필의 스냅샷이므로 현재 프로필과 다를 수 있다.
 
 ## 5. 오류 처리
 
@@ -61,6 +80,10 @@ def run_analysis(payload: dict) -> dict:
 
 `ValidationError`를 그대로 클라이언트에 노출하지 마라. 오류 위치(`loc`)와 유형(`type`)만
 전달하고 `input` 필드는 사용자 원본 값이므로 로그에도 남기지 않는 편이 안전하다.
+
+**`loc`에도 사용자 값이 섞인다.** `profile.purposes`는 패키지명을 키로 쓰므로
+`("profile", "purposes", "com.private.app")` 같은 경로가 나온다. 선언된 필드 이름이
+아닌 조각은 가려라. 이 패키지의 CLI는 `_safe_location()`으로 그렇게 처리한다.
 
 ## 6. week_status
 
@@ -101,6 +124,11 @@ def run_analysis(payload: dict) -> dict:
 해당 유형의 `proposals`가 **비어 있으면** 아직 기준선(유효 7개)을 확보하지 못한 것이다.
 임시 목표를 계속 쓰고, 이유는 `insights`의 `INSUFFICIENT_DATA`가 설명한다.
 
+### per_app에 포함되는 앱
+
+이번 주 기록에 등장한 앱뿐 아니라 **이전 주에만 쓰인 앱과 선택한 앱(`target_packages`)** 도
+포함된다. 사용을 완전히 끊은 앱의 `0분 / -100%` 변화가 화면에서 사라지지 않게 하기 위해서다.
+
 ## 8. 미션 판정
 
 `analyze`는 **입력으로 받은 Mission만** 판정한다. 미션을 새로 만들지 않는다.
@@ -114,6 +142,10 @@ def run_analysis(payload: dict) -> dict:
 ```
 
 야간은 `pre_bed`와 `after_bed`가 **둘 다** complete일 때만 complete다.
+
+성공 카운트는 **`week_start` 주간의 미션만** 센다. 입력에 이전 주 미션을 함께 보내도
+감축 조건(판정 7개·성공 5개) 계산에는 보고서 주간만 쓰인다.
+`mission_results`에는 보낸 미션이 모두 들어간다.
 
 성공률 분모에서 `unknown` / `in_progress` / `not_applicable`은 제외된다.
 `daily_evaluable_count`가 분모이고 `daily_success_count`가 분자다.
@@ -154,6 +186,10 @@ AI 패키지는 실제 수집 여부나 사용자 신원을 검증할 수 없다
 
 `evidence`의 수치와 `text`의 숫자는 항상 일치한다. 외부 모델이 숫자를 다시 계산하지 않도록
 코드가 문장 슬롯에 값을 넣는다.
+
+`INSUFFICIENT_DATA` 문구는 `current_*_target_ms` 전달 여부에 따라 달라진다.
+활성 목표를 보내면 '현재 목표는 그대로 유지됩니다', 보내지 않으면 '임시 목표를 사용합니다'가 된다.
+**활성 목표가 있는데 null로 보내면 사용자에게 잘못된 안내가 나간다.**
 
 ## 13. 예제와 스키마
 

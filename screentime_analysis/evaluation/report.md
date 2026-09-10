@@ -1,12 +1,12 @@
 # 평가 보고서
 
-작성일: 2026-09-10 · 대상: `screentime` 0.1.0 · 규칙 버전: `2026-09-10.1`
+작성일: 2026-09-10 (리뷰 수정 반영) · 대상: `screentime` 0.1.0 · 규칙 버전: `2026-09-10.1`
 
 ## 1. 실행 환경과 결과
 
 | 명령 | 결과 |
 |---|---|
-| `python -m pytest -q` | **102 passed** |
+| `python -m pytest -q` | **110 passed** |
 | `python -m ruff check .` | **All checks passed** |
 | `python -m build --wheel` | `screentime-0.1.0-py3-none-any.whl` 생성 |
 | 새 venv에 wheel 설치 후 `from screentime import analyze` | 정상 |
@@ -15,8 +15,8 @@
 **계획서는 Python 3.12를 명시했으나 이 머신에 3.12가 없어 CPython 3.13.9로 검증했다.**
 `requires-python`은 `>=3.12`이고 3.12 전용 문법·API는 쓰지 않았으나 **3.12 실행은 미검증**이다.
 
-파일별 테스트: models 24, missions 19, analytics 15, windows 14, contract_examples 8,
-narratives 8, pipeline 8, cli 6.
+파일별 테스트: models 26, missions 19, analytics 18, windows 14, narratives 10,
+contract_examples 8, pipeline 8, cli 7.
 
 ## 2. 계산 기대값 일치
 
@@ -45,7 +45,7 @@ narratives 8, pipeline 8, cli 6.
 | F07 | 일요일 자정 넘김의 일별·야간 분리 | AI 경계 / FE 수집 | ⚠️ AI 경계만 테스트됨 |
 | F08 | 월요일 00:01 → in_progress, 미수집 → awaiting_data | AI | ✅ 테스트됨 |
 | F09 | 성공 2·unknown 5 → `2/2`, 감축 조건 미충족 | AI | ✅ 테스트됨 |
-| F10 | 같은 범위 2번 동기화해도 2배가 되지 않음 | AI 키 검증 / **BE upsert** | ⚠️ 부분 |
+| F10 | 같은 범위 2번 동기화해도 2배가 되지 않음 | AI 키·경계 검증 / **BE upsert** | ⚠️ 부분 |
 | F11 | 설정 변경 후 과거 보고서의 비교 제한 | AI | ✅ 테스트됨 |
 | F12 | 월요일 정오 수락은 다음 미시작 구간부터 | AI 판정 / **BE 저장** | ⚠️ 부분 |
 | F13 | 한 앱 Activity 겹침 10분이 20분 아님 | **FE** | ❌ AI 범위 밖 |
@@ -65,6 +65,7 @@ narratives 8, pipeline 8, cli 6.
   실제 Android 이벤트가 그 경계대로 수집되는지는 실기기 확인이 필요하다.
   `contracts/fixtures.json`으로 FE 로컬 구현을 대조할 수 있다.
 - **F10** — 같은 집계 키의 중복은 입력 단계에서 `ValidationError`로 막고,
+  집계 경계가 프로필 계산값과 다르면 요청을 거부하며,
   같은 입력의 재호출이 같은 결과를 내는 것도 확인했다.
   로컬 저장의 upsert(누적 더하기 금지)는 BE/FE 구현이다.
 - **F12 / F16** — `accepted_at_ms > window_start_ms`이면 `not_applicable`을 반환하는 것까지가 AI다.
@@ -99,6 +100,21 @@ narratives 8, pipeline 8, cli 6.
 - 존재하지 않는 로컬 시각(02:30) → 전환 후 첫 유효 시각(03:00)
 - 중복 로컬 시각(01:30) → 먼저 오는 오프셋(EDT, UTC-4)
 - 평일/주말 일정은 **밤을 시작하는 저녁의 요일**로 고른다
+
+### 코드 리뷰에서 지적받아 수정한 결함 (5건)
+
+초기 구현(`819d1ba`) 이후 리뷰에서 지적된 5건을 재현하고 고쳤다. 각각 회귀 테스트를 남겼다.
+
+| # | 결함 | 영향 | 수정 |
+|---|---|---|---|
+| 1 | 여러 주의 미션을 합산해 감축 조건을 통과시킴 | **P1** — 목표가 잘못 낮아짐 | `_mission_counts`가 `week_start` 주간만 센다 |
+| 2 | 집계 경계를 프로필과 대조하지 않음 | **P1** — 1분 구간 + 빈 앱으로 하루를 '확인된 0'으로 위조 가능 | `AnalysisInput`에서 daily/pre_bed/after_bed 경계 일치를 검증 |
+| 3 | 사용을 끊은 앱이 비교에서 사라짐 | P2 — `0분 / -100%`가 누락 | `per_app`에 이전 주 앱과 선택 앱을 포함하고 미사용을 0으로 표시 |
+| 4 | 활성 목표가 있어도 '임시 목표 사용' 안내 | P2 — 사실과 다른 안내 | `render_insights`가 현재 목표를 받아 문구를 구분 |
+| 5 | CLI 오류 경로에 사용자 패키지명 노출 | P2 — 값 유출 | 선언된 필드 이름이 아닌 경로 조각을 `<key>`로 마스킹 |
+
+1·2번은 **판정 결과 자체를 왜곡**하는 결함이라 우선순위가 높았다.
+2번은 FE가 잘못된 경계를 보내면 조용히 통과하던 문제라, 이제 요청 전체가 거부된다.
 
 ### 구현 중 발견해 수정한 결함
 

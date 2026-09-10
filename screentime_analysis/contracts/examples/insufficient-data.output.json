@@ -3,6 +3,7 @@
     {
       "code": "INSUFFICIENT_DATA",
       "evidence": {
+        "has_active_target": 0,
         "valid_days": 0,
         "valid_nights": 0
       },
@@ -24,7 +25,18 @@
     "daily_success_count": 0,
     "night_evaluable_count": 0,
     "night_success_count": 0,
-    "per_app": [],
+    "per_app": [
+      {
+        "delta_ms": null,
+        "delta_pct": null,
+        "is_target": true,
+        "night_share_pct": null,
+        "night_total_ms": null,
+        "package_name": "com.example.video",
+        "share_pct": null,
+        "total_ms": null
+      }
+    ],
     "per_day": [
       {
         "after_bed_ms": null,

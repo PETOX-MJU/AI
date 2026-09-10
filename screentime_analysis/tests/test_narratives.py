@@ -88,3 +88,35 @@ def test_daily_night_summary_marks_missing_evaluations(unavailable_week_request)
     metrics = analyze_week(unavailable_week_request)
     insights = render_insights(metrics, unavailable_week_request.profile)
     assert CODE_DAILY_NIGHT not in codes(insights)  # 판정 가능한 미션이 하나도 없다
+
+
+def test_insufficient_text_depends_on_active_target(unavailable_week_request):
+    """기존 개인화 목표가 있는 사용자에게 '임시 목표를 사용합니다'라고 하면 사실과 다르다."""
+    metrics = analyze_week(unavailable_week_request)
+    profile = unavailable_week_request.profile
+
+    initial = next(i for i in render_insights(metrics, profile) if i.code == CODE_INSUFFICIENT)
+    assert "임시 목표" in initial.text
+    assert initial.evidence["has_active_target"] == 0
+
+    existing = next(
+        i
+        for i in render_insights(
+            metrics, profile, current_daily_target_ms=90 * MINUTE, current_night_target_ms=15 * MINUTE
+        )
+        if i.code == CODE_INSUFFICIENT
+    )
+    assert "임시 목표" not in existing.text
+    assert "현재 목표는 그대로 유지됩니다" in existing.text
+    assert existing.evidence["has_active_target"] == 1
+
+
+def test_pipeline_passes_active_targets_to_insights(unavailable_week_request):
+    """analyze가 현재 목표를 설명 생성에 전달하는지 확인한다."""
+    from screentime import analyze
+
+    request = unavailable_week_request.model_copy(
+        update={"current_daily_target_ms": 90 * MINUTE, "current_night_target_ms": 15 * MINUTE}
+    )
+    insight = next(i for i in analyze(request).insights if i.code == CODE_INSUFFICIENT)
+    assert "임시 목표" not in insight.text

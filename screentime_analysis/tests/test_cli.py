@@ -78,3 +78,18 @@ def test_cli_reports_malformed_json_without_echoing_it(tmp_path):
 def test_cli_missing_file(tmp_path):
     proc = run(["--input", str(tmp_path / "nope.json"), "--output", str(tmp_path / "out.json")])
     assert proc.returncode == 2
+
+
+def test_cli_masks_user_defined_dict_keys(tmp_path):
+    """`profile.purposes`의 키는 사용자가 정한 패키지명이다. 오류 경로에 그대로 나오면 안 된다."""
+    bad = tmp_path / "bad.json"
+    payload = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+    secret = "com.private.SECRETAPP"
+    payload["profile"]["purposes"] = {secret: 12345}  # 값이 문자열이 아니라 오류가 난다
+    bad.write_text(json.dumps(payload), encoding="utf-8")
+
+    proc = run(["--input", str(bad), "--output", str(tmp_path / "never.json")])
+    assert proc.returncode == 2
+    assert secret not in proc.stderr
+    assert secret not in proc.stdout
+    assert "profile.purposes.<key>" in proc.stderr  # 위치 구조는 알려준다

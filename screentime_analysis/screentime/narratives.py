@@ -135,24 +135,54 @@ def _daily_vs_night(metrics: WeeklyMetrics) -> Insight | None:
     )
 
 
-def _insufficient(metrics: WeeklyMetrics) -> Insight | None:
+def _insufficient(metrics: WeeklyMetrics, has_active_target: bool) -> Insight | None:
+    """최초 수집 단계와 기존 사용자의 기록 누락을 구분한다.
+
+    이미 개인화 목표를 쓰고 있는 사용자에게 '임시 목표를 사용합니다'라고 안내하면
+    사실과 다르다.
+    """
     if metrics.valid_days >= DAYS_PER_WEEK and metrics.valid_nights >= DAYS_PER_WEEK:
         return None
-    return Insight(
-        code=CODE_INSUFFICIENT,
-        evidence={"valid_days": metrics.valid_days, "valid_nights": metrics.valid_nights},
-        text=(
-            f"분석에 사용할 수 있는 날은 {metrics.valid_days}일, 야간 구간은 {metrics.valid_nights}개입니다. "
+
+    counts = (
+        f"분석에 사용할 수 있는 날은 {metrics.valid_days}일, 야간 구간은 {metrics.valid_nights}개입니다. "
+    )
+    if has_active_target:
+        tail = (
+            f"{DAYS_PER_WEEK}개가 모이지 않아 이번 주 성과로는 다음 목표를 계산하지 않습니다. "
+            "현재 목표는 그대로 유지됩니다."
+        )
+    else:
+        tail = (
             f"각각 {DAYS_PER_WEEK}개가 모여야 개인 기준선을 계산합니다. "
             "그때까지는 처음 입력한 임시 목표를 사용합니다."
-        ),
+        )
+    return Insight(
+        code=CODE_INSUFFICIENT,
+        evidence={
+            "valid_days": metrics.valid_days,
+            "valid_nights": metrics.valid_nights,
+            "has_active_target": int(has_active_target),
+        },
+        text=counts + tail,
     )
 
 
-def render_insights(metrics: WeeklyMetrics, profile: Profile) -> list[Insight]:
-    """근거 필드와 문장의 숫자가 항상 일치하도록 만든다."""
+def render_insights(
+    metrics: WeeklyMetrics,
+    profile: Profile,
+    *,
+    current_daily_target_ms: int | None = None,
+    current_night_target_ms: int | None = None,
+) -> list[Insight]:
+    """근거 필드와 문장의 숫자가 항상 일치하도록 만든다.
+
+    ``current_*_target_ms``는 사용자가 이미 수락한 개인화 목표다. 주어지면
+    최초 수집 단계가 아니라는 뜻이므로 임시 목표 안내를 하지 않는다.
+    """
+    has_active_target = current_daily_target_ms is not None or current_night_target_ms is not None
     candidates = [
-        _insufficient(metrics),
+        _insufficient(metrics, has_active_target),
         _decreased(metrics),
         _other_apps_increased(metrics),
         _night_top_app(metrics, profile),

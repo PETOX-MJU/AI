@@ -301,12 +301,28 @@ class AnalysisInput(Strict):
         if len(versions) > 1:
             raise ValueError("한 요청의 measurement_version은 하나여야 합니다")
 
+        # 순환 임포트를 피하려고 지연 임포트한다. windows가 이 모듈을 임포트한다.
+        from .windows import daily_window, night_windows
+
         for agg in self.aggregates:
             if agg.profile_version != self.profile.version:
                 raise ValueError(f"집계 profile_version({agg.profile_version})이 프로필과 다릅니다")
             # complete는 이미 끝난 구간에만 붙일 수 있다. 진행 중 구간의 complete를 막는다.
             if agg.quality == "complete" and agg.end_ms > self.as_of_ms:
                 raise ValueError("아직 끝나지 않은 구간을 complete로 표시할 수 없습니다")
+
+            # 집계 경계가 프로필로 계산한 구간과 같아야 한다. 이걸 검사하지 않으면
+            # 1분짜리 구간에 빈 앱 목록을 넣어 하루 전체를 '확인된 0'으로 만들 수 있다.
+            if agg.kind == "daily":
+                expected = daily_window(agg.anchor_date, self.profile)
+            else:
+                pre, post = night_windows(agg.anchor_date, self.profile)
+                expected = pre if agg.kind == "pre_bed" else post
+            if (agg.start_ms, agg.end_ms) != (expected.start_ms, expected.end_ms):
+                raise ValueError(
+                    f"{agg.anchor_date} {agg.kind} 구간이 프로필로 계산한 경계와 다릅니다: "
+                    f"입력 [{agg.start_ms}, {agg.end_ms}) / 기대 [{expected.start_ms}, {expected.end_ms})"
+                )
 
         mission_ids = [m.id for m in self.missions]
         if len(set(mission_ids)) != len(mission_ids):

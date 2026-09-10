@@ -51,8 +51,8 @@ AI 패키지는 `complete`이면서 `end_ms > as_of_ms`인 집계를 **거부한
 
 ## 4. 구간 경계
 
-AI가 프로필로 계산한 경계와 FE가 보낸 `start_ms`/`end_ms`는 같아야 한다.
-`fixtures.json`으로 대조하라.
+AI가 프로필로 계산한 경계와 FE가 보낸 `start_ms`/`end_ms`는 **정확히 같아야 한다.**
+다르면 `ValidationError`로 요청 전체가 거부된다. `fixtures.json`으로 대조하라.
 
 | kind | 범위 |
 |---|---|

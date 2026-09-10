@@ -31,7 +31,7 @@
         "delta_pct": null,
         "is_target": false,
         "night_share_pct": null,
-        "night_total_ms": null,
+        "night_total_ms": 0,
         "package_name": "com.example.chat",
         "share_pct": 25.0,
         "total_ms": 16800000

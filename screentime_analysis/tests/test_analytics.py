@@ -250,3 +250,88 @@ def test_week_totals_helper_is_reusable(full_week_request):
     totals = week_totals(full_week_request, WEEK_START)
     assert totals.is_full is True
     assert totals.per_app_day_ms[TARGET] == 840 * MINUTE
+
+
+def test_mission_counts_only_include_report_week(seoul_profile):
+    """이전 주 성적이 섞이면 감축 조건을 잘못 통과시킨다.
+
+    지난주 7회 성공 + 이번 주 7회 실패를 넣으면 합산 시 7/14가 되어 목표가 낮아진다.
+    보고서 주간만 세면 0/7이므로 유지해야 한다.
+    """
+    from screentime.missions import REASON_MAINTAIN_INSUFFICIENT_SUCCESS, propose_targets
+
+    as_of = as_of_after(WEEK_START, seoul_profile)
+    aggregates = week_aggregates(
+        PREV_WEEK_START, seoul_profile, daily_ms=10 * MINUTE, pre_bed_ms=0, after_bed_ms=0
+    ) + week_aggregates(
+        WEEK_START, seoul_profile, daily_ms=200 * MINUTE, pre_bed_ms=0, after_bed_ms=0
+    )
+    missions = make_missions(
+        PREV_WEEK_START, seoul_profile, daily_target_ms=120 * MINUTE, night_target_ms=30 * MINUTE
+    ) + make_missions(
+        WEEK_START, seoul_profile, daily_target_ms=120 * MINUTE, night_target_ms=30 * MINUTE
+    )
+    request = AnalysisInput(
+        as_of_ms=as_of,
+        last_collection_attempt_ms=as_of,
+        week_start=WEEK_START,
+        profile=seoul_profile,
+        aggregates=aggregates,
+        missions=missions,
+        current_daily_target_ms=120 * MINUTE,
+        current_night_target_ms=30 * MINUTE,
+    )
+    metrics = analyze_week(request)
+
+    assert metrics.daily_evaluable_count == 7  # 14가 아니다
+    assert metrics.daily_success_count == 0  # 이번 주는 전부 실패
+
+    daily = next(p for p in propose_targets(request, metrics) if p.kind == "daily")
+    assert daily.target_ms == 120 * MINUTE
+    assert daily.reason_code == REASON_MAINTAIN_INSUFFICIENT_SUCCESS
+
+
+def test_stopped_app_still_appears_with_full_decrease(seoul_profile):
+    """지난주에만 쓰고 이번 주에 끊은 앱이 비교에서 사라지면 안 된다."""
+    as_of = as_of_after(WEEK_START, seoul_profile)
+    aggregates = week_aggregates(
+        PREV_WEEK_START, seoul_profile, daily_ms=60 * MINUTE, pre_bed_ms=0, after_bed_ms=0,
+        other_daily_ms=60 * MINUTE,
+    ) + week_aggregates(
+        WEEK_START, seoul_profile, daily_ms=60 * MINUTE, pre_bed_ms=0, after_bed_ms=0,
+    )
+    request = AnalysisInput(
+        as_of_ms=as_of,
+        last_collection_attempt_ms=as_of,
+        week_start=WEEK_START,
+        profile=seoul_profile,
+        aggregates=aggregates,
+        missions=[],
+        current_daily_target_ms=None,
+        current_night_target_ms=None,
+    )
+    metrics = analyze_week(request)
+    stopped = next(a for a in metrics.per_app if a.package_name == OTHER)
+
+    assert stopped.total_ms == 0  # 완전한 기록에서의 미사용은 0이다
+    assert stopped.delta_ms == -7 * 60 * MINUTE
+    assert stopped.delta_pct == -100.0
+
+
+def test_target_package_appears_even_with_no_records(seoul_profile):
+    """선택한 앱은 기록이 없어도 결과에 남는다."""
+    metrics = analyze_week(
+        AnalysisInput(
+            as_of_ms=as_of_after(WEEK_START, seoul_profile),
+            last_collection_attempt_ms=as_of_after(WEEK_START, seoul_profile),
+            week_start=WEEK_START,
+            profile=seoul_profile,
+            aggregates=[],
+            missions=[],
+            current_daily_target_ms=None,
+            current_night_target_ms=None,
+        )
+    )
+    row = next(a for a in metrics.per_app if a.package_name == TARGET)
+    assert row.is_target is True
+    assert row.total_ms is None  # complete 구간이 없으면 0이 아니라 null

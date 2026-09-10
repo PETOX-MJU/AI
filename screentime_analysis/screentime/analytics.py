@@ -188,13 +188,24 @@ def _app_metrics(
     request: AnalysisInput, current: WeekTotals, previous: WeekTotals, comparison: Comparison
 ) -> list[AppMetrics]:
     packages = request.target_packages
-    names = sorted(set(current.per_app_day_ms) | set(current.per_app_night_ms))
+    # 이전 주에만 쓰인 앱과 선택한 앱도 포함한다. 사용을 완전히 끊은 앱의
+    # 0분·-100% 변화가 비교 화면에서 사라지면 안 된다.
+    names = sorted(
+        set(current.per_app_day_ms)
+        | set(current.per_app_night_ms)
+        | set(previous.per_app_day_ms)
+        | set(previous.per_app_night_ms)
+        | packages
+    )
+    # complete 구간이 하나라도 있으면 기록에 없는 앱은 '확인된 0'이다.
+    day_default = 0 if current.all_apps_total_ms is not None else None
+    night_default = 0 if current.valid_nights > 0 else None
     rows: list[AppMetrics] = []
 
     for name in names:
         is_target = name in packages
-        total = current.per_app_day_ms.get(name)
-        night_total = current.per_app_night_ms.get(name) if name in current.per_app_night_ms else None
+        total = current.per_app_day_ms.get(name, day_default)
+        night_total = current.per_app_night_ms.get(name, night_default)
         delta_ms = delta_pct = None
         if comparison.comparable:
             before = previous.per_app_day_ms.get(name, 0)
@@ -231,8 +242,13 @@ def mission_results(request: AnalysisInput) -> list[MissionResult]:
 
 
 def _mission_counts(results: list[MissionResult], request: AnalysisInput) -> dict[str, int]:
-    """성공률 분모에서 unknown·in_progress·not_applicable을 제외한다."""
-    kinds = {m.id: m.kind for m in request.missions}
+    """**보고서 주간의** 미션만 센다. 성공률 분모에서 unknown·in_progress·not_applicable은 제외한다.
+
+    입력에는 이전 주 미션도 함께 올 수 있다. 주간으로 거르지 않으면 여러 주의 성적이
+    합산되어 감축 조건(판정 7개·성공 5개)을 잘못 통과시킨다.
+    """
+    in_week = set(week_dates(request.week_start))
+    kinds = {m.id: m.kind for m in request.missions if m.anchor_date in in_week}
     counts = {"daily_success": 0, "daily_evaluable": 0, "night_success": 0, "night_evaluable": 0}
     for result in results:
         kind = kinds.get(result.mission_id)

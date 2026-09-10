@@ -23,6 +23,11 @@ def analyze(request: AnalysisInput) -> AnalysisOutput:
         metrics=metrics,
         mission_results=mission_results(request),
         proposals=propose_targets(request, metrics),
-        insights=render_insights(metrics, request.profile),
+        insights=render_insights(
+            metrics,
+            request.profile,
+            current_daily_target_ms=request.current_daily_target_ms,
+            current_night_target_ms=request.current_night_target_ms,
+        ),
         rules_version=RULES_VERSION,
     )
