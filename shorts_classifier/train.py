@@ -88,8 +88,9 @@ def main() -> None:
         tf.keras.metrics.Recall(name="recall"),
     ]
     callbacks = [
-        # 오탐이 사용자를 쫓아내므로 정밀도를 기준으로 저장한다.
-        tf.keras.callbacks.ModelCheckpoint(checkpoint, monitor="val_precision", mode="max", save_best_only=True),
+        # 정밀도로 고르면 숏폼을 몇 장만 조심스럽게 맞히는 초반 모델이 100%로 뽑힌다.
+        # 저장은 손실로 하고, 정밀도 우선 판정은 eval.py 의 임계값 선택에서 한다.
+        tf.keras.callbacks.ModelCheckpoint(checkpoint, monitor="val_loss", mode="min", save_best_only=True),
         tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True),
     ]
 
@@ -101,7 +102,8 @@ def main() -> None:
 
     if args.finetune_epochs:
         print("\n[2/2] 백본 상위 레이어 미세조정")
-        base = model.get_layer("MobilenetV3small")
+        # Keras 버전마다 이름 대소문자가 다르다 (2.x: MobilenetV3small, 3.x: MobileNetV3Small)
+        base = next(l for l in model.layers if l.name.lower() == "mobilenetv3small")
         base.trainable = True
         for layer in base.layers[:-30]:
             layer.trainable = False
@@ -109,7 +111,7 @@ def main() -> None:
         model.fit(train_ds, validation_data=val_ds, epochs=args.finetune_epochs, class_weight=weights, callbacks=callbacks)
 
     model.save(BUILD / "final.keras")
-    print(f"\n저장 완료: {checkpoint} (최고 정밀도), {BUILD / 'final.keras'} (최종)")
+    print(f"\n저장 완료: {checkpoint} (최저 검증 손실), {BUILD / 'final.keras'} (최종)")
     print("다음: python export_tflite.py && python eval.py")
 
 

@@ -13,11 +13,28 @@ VLM 베이스라인은 `../experiments/shorts_detection/` 에 있다. 비교 대
 ## 순서
 
 ```
-python prepare.py          # datasets/raw → datasets/split (train/val 분리)
-python train.py            # 헤드 학습 + 백본 미세조정
-python export_tflite.py    # int8 양자화 TFLite 변환
-python eval.py             # 임계값 선택
+python prepare.py              # datasets/raw → datasets/split (train/val, 잠근 test 분리)
+python train.py                # 헤드 학습 + 백본 미세조정
+python export_tflite.py        # float16 TFLite 변환 (int8 은 로드 실패가 확인돼 기본값이 아니다)
+python eval.py                 # val 에서 임계값 선택 (최근 5장 평균 판정)
+python eval.py --split test    # 임계값·창 크기를 정한 뒤 최종 판정 한 번
 ```
+
+테스트: `python test_prepare.py && python test_eval.py`
+
+### 최종 test 세션 잠그기
+
+val 은 체크포인트·임계값·창 크기를 고르는 데 쓰이므로 수치가 낙관적이다.
+**학습에 한 번도 안 쓴 세션**을 `datasets/test_sessions.txt` 에 한 줄에 하나씩 적어 잠근다.
+
+```
+galaxyA_yt_s10   # 안드로이드, 새로 찍은 녹화
+galaxyA_ig_s11
+```
+
+- `prepare.py` 가 매번 이 세션을 `split/test/` 로만 보낸다. 적힌 세션이 없으면 오타로 보고 멈춘다.
+- test 결과를 보고 임계값·창 크기를 다시 고치면 test 가 아니게 된다. 그때는 새 녹화로 test 를 바꿔라.
+- 안드로이드 녹화, 두 라벨 모두, 여러 앱으로 채워라.
 
 ## 데이터 수집 가이드
 
@@ -27,16 +44,43 @@ python eval.py             # 임계값 선택
 > 각 앱에 올리고 그 화면을 찍는다. 분류기가 학습하는 건 영상 내용이 아니라 UI 배치라서
 > 정확도 손실 없이 저작권 쟁점만 사라진다. [LICENSING.md](../LICENSING.md) 참고.
 
-`datasets/raw/shorts/` — 유튜브 Shorts, 인스타 Reels, 틱톡 피드 재생 화면
+**화면 녹화 → 프레임 추출이 제일 빠르다.** 파일명은 `{기기}_{앱}_{세션}_{번호}` 로 맞춰라.
+`prepare.py` 가 앞 세 조각을 세션으로 보고 세션째로 train/val 을 나눈다 (같은 녹화의 프레임이 양쪽에 새지 않게).
 
-`datasets/raw/not_shorts/` — **여기가 중요하다.** 헷갈리는 화면을 일부러 많이 넣어라:
+```
+ffmpeg -i s01.mp4 -vf fps=1 datasets/raw/shorts/galaxyA_yt_s01_%04d.jpg
+```
+
+**adb 로 자동 수집할 수도 있다** — [collect_android.py](collect_android.py). 에뮬레이터도 된다.
+
+```
+python collect_android.py yt_shorts yt_home yt_search yt_video --seconds 40 --repeat 3
+```
+
+시나리오 하나가 세션 하나이고 라벨도 하나다. 대상 앱이 떠 있을 때만 저장하고, 기대한 화면이
+아닌 구간(광고 등)은 버린다. 세션마다 다크 모드·글자 크기를 바꾼다.
+`datasets/review/` 의 썸네일 격자를 훑어보고 이상한 세션은 `datasets/raw` 에서 지워라.
+
+**에뮬레이터 화면은 학습용으로만 쓴다.** 순정 안드로이드라 갤럭시 One UI 와 다르므로
+잠근 test 는 실기기 녹화로 채운다.
+
+`datasets/raw/shorts/` — 유튜브 Shorts, 인스타 Reels, 틱톡 피드 재생 화면.
+**숏폼 위에 댓글창이 열린 화면도 shorts 다** (댓글 읽는 시간도 시청으로 본다). 영상이 넘어가는 중인 프레임은 버린다.
+
+`datasets/raw/not_shorts/` — **여기가 중요하다.** 유튜브·인스타·틱톡 **안의** 헷갈리는 화면을 일부러 많이 넣어라:
 - 인스타 스토리 (세로 전체화면이지만 숏폼 아님)
 - 유튜브 홈의 Shorts 썸네일 줄
-- 세로로 찍은 일반 영상
-- 유튜브 검색·댓글·프로필
-- 카톡, 브라우저, 게임
+- 세로로 찍은 일반 영상, 일반 영상의 댓글
+- 유튜브 검색·구독·프로필
+- 인스타 피드·DM·탐색 탭, 틱톡 프로필·검색·라이브
 
 여기서 틀리면 실제 앱에서도 틀린다. 쉬운 샘플만 모으면 검증 점수만 좋고 현장에서 무너진다.
+
+**세 앱 밖의 화면(카톡·브라우저·게임)은 넣지 마라.** 캡처 화이트리스트 때문에 모델에 들어올 일이 없고,
+구분하기 쉬운 샘플이라 검증 정밀도만 부풀린다.
+
+**장수보다 녹화 개수(세션)가 중요하다.** 한 녹화의 프레임은 서로 거의 같아서 90초 하나보다 30초 셋이 낫다.
+다크 모드, 글자 크기, 기기(화면비)를 녹화마다 바꿔라.
 
 ## 판정 기준
 
@@ -55,7 +99,11 @@ python eval.py             # 임계값 선택
 ## 앱 연동 메모
 
 - 입력: 224x224 RGB, 0-255 (모델에 전처리가 내장되어 있어 앱에서 정규화 불필요)
-- 출력: 0~1 스칼라. 임계값 이상이면 숏폼
+- 세로 화면을 **가운데 자르기 없이 224x224 로 늘려서** 넣는다. 학습이 그렇게 했다
+- 출력: 0~1 스칼라 (한 장 점수)
+- **판정은 최근 N장 점수의 평균이 임계값 이상일 때 숏폼.** N·임계값은 `eval.py` 가 모델과 함께 정한다.
+  N장이 모이기 전에는 숏폼으로 판정하지 않는다. 대상 앱이 바뀌거나 캡처가 끊기면 평균을 초기화한다.
+  평가는 1초 간격 프레임 기준이므로 캡처 간격이 다르면 N 을 다시 골라야 한다
 - 좌우 반전 증강은 넣지 않았다 — 숏폼 UI 버튼이 항상 오른쪽에 있는 게 핵심 단서라 반전시키면 단서가 깨진다
 
 ## 캡처 제약
