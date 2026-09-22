@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parent.parent
 BUILD = Path(__file__).resolve().parent / "build"
 SPLIT = ROOT / "datasets" / "split"
 CLASS_NAMES = ("not_shorts", "shorts")
+MIN_PRECISION = 0.95
 
 
 def predict_all(model_path: Path, split_dir: Path) -> tuple[np.ndarray, np.ndarray, list[str]]:
@@ -126,8 +127,9 @@ def main() -> None:
             f"{r['fp']:>8}{r['fn']:>8}{r['run']:>9}장"
         )
 
-    # 정밀도 90% 이상을 만족하는 것들 중 재현율이 가장 높은 임계값
-    safe = [r for r in rows if r["precision"] >= 0.90]
+    # 정밀도 MIN_PRECISION 이상 중 재현율이 가장 높은 임계값.
+    # 90% 로 두면 오탐률 5% 대 임계값이 뽑혔다 — 오탐이 사용자를 쫓아내는 제품이라 95% 로 올렸다.
+    safe = [r for r in rows if r["precision"] >= MIN_PRECISION]
     print("\n" + "=" * 64)
     if safe:
         best = max(safe, key=lambda r: r["recall"])
@@ -139,7 +141,7 @@ def main() -> None:
         if best["recall"] < 0.80:
             print("\n[주의] 재현율이 80% 미만입니다. 숏폼을 자주 놓칩니다. 데이터를 더 모으세요.")
     else:
-        print("[실패] 정밀도 90%를 넘는 임계값이 없습니다.")
+        print(f"[실패] 정밀도 {MIN_PRECISION:.0%}를 넘는 임계값이 없습니다.")
         print("이대로 출시하면 엉뚱한 화면에서 캐릭터가 튀어나옵니다.")
         print("→ 데이터를 더 모으거나, 앱 단위 감지(A안)로 후퇴하세요.")
     if args.split == "val":

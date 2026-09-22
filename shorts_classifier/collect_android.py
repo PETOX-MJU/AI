@@ -128,8 +128,13 @@ class Device:
         self.shell(f"input tap {x} {y}")
 
     def tap_label(self, key: str, bottom: bool = False, nodes: list[Node] | None = None) -> None:
-        found = [n for n in (nodes or self.nodes()) if n.desc in LABELS[key] or n.text in LABELS[key]]
-        if not found:
+        for _ in range(3):  # 앱이 막 켜진 직후에는 탭이 아직 안 그려졌을 수 있다
+            found = [n for n in (nodes or self.nodes()) if n.desc in LABELS[key] or n.text in LABELS[key]]
+            if found:
+                break
+            nodes = None
+            time.sleep(3)
+        else:
             raise RuntimeError(f"화면에서 {LABELS[key]} 를 찾지 못했습니다")
         self.tap(*max(found, key=lambda n: n.y1).center if bottom else found[0].center)
 
