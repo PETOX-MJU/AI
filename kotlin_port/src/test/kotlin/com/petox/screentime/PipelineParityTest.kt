@@ -23,8 +23,8 @@ class PipelineParityTest {
     private fun examplesDir(): File {
         // 테스트는 kotlin_port/ 에서 실행된다. 계약 문서 경로는 형제 디렉터리다.
         val candidates = listOf(
-            File("../screentime_analysis/contracts/examples"),
-            File("screentime_analysis/contracts/examples"),
+            File("contracts/examples"),
+            File("kotlin_port/contracts/examples"),
         )
         return candidates.firstOrNull { it.isDirectory }
             ?: error("contracts/examples 디렉터리를 찾을 수 없습니다: ${candidates.map { it.absolutePath }}")

@@ -35,10 +35,10 @@ UsageStatsManager / Room
 
 | 목적 | 파일 |
 |---|---|
-| Android 수집·품질 계약 | [`../../screentime_analysis/contracts/android-data-contract.md`](../../screentime_analysis/contracts/android-data-contract.md) |
-| 분석 출력 JSON Schema | [`../../screentime_analysis/contracts/output.schema.json`](../../screentime_analysis/contracts/output.schema.json) |
-| 정상 주간 예제 | [`../../screentime_analysis/contracts/examples/complete-week.output.json`](../../screentime_analysis/contracts/examples/complete-week.output.json) |
-| 데이터 부족 예제 | [`../../screentime_analysis/contracts/examples/insufficient-data.output.json`](../../screentime_analysis/contracts/examples/insufficient-data.output.json) |
+| Android 수집·품질 계약 | [`../../kotlin_port/contracts/android-data-contract.md`](../../kotlin_port/contracts/android-data-contract.md) |
+| 분석 출력 JSON Schema | [`../../kotlin_port/contracts/output.schema.json`](../../kotlin_port/contracts/output.schema.json) |
+| 정상 주간 예제 | [`../../kotlin_port/contracts/examples/complete-week.output.json`](../../kotlin_port/contracts/examples/complete-week.output.json) |
+| 데이터 부족 예제 | [`../../kotlin_port/contracts/examples/insufficient-data.output.json`](../../kotlin_port/contracts/examples/insufficient-data.output.json) |
 | Kotlin 화면 전 분석 진입점 | `kotlin_port/src/main/kotlin/com/petox/screentime/Pipeline.kt` |
 
 정본과 이 문서가 충돌하면 `output.schema.json`과 Kotlin 모델을 우선한다.

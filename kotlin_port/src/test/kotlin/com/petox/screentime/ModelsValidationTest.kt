@@ -9,7 +9,7 @@ import kotlin.test.assertNull
 /**
  * `models.py` 검증 규칙 parity 테스트.
  *
- * Python 이 정본이다 — 불일치가 나면 Kotlin 을 고친다.
+ * 기대값은 이식 당시 Python 실행값이다. 규칙을 바꿀 때는 README 「규칙을 바꿀 때」를 따른다.
  * 가장 중요한 건 경계 위조 방지다: 1분짜리 구간에 빈 앱 목록을 넣어 하루 전체를
  * '확인된 0'으로 만드는 공격을 막는다.
  */

@@ -1,43 +1,25 @@
-# 분석 규칙 상세 — 이식·연동 참고 문서
+# 분석 규칙 상세
 
-> **이 문서의 위치가 바뀌었다.** 분석은 **앱에서 Kotlin으로 실행**하기로 확정됐고
-> BE는 이 패키지를 호출하지 않는다. BE 범위는 계정 동기화·백업뿐이다.
->
-> 이 문서는 이제 **판정·경계·버전 규칙의 상세 명세**로 쓰인다. Kotlin 이식 시
-> 4절(null과 0), 4-1절(구간 경계), 6~9절(판정 규칙)이 그대로 적용된다.
-> 이식 절차는 [`kotlin-port.md`](kotlin-port.md) 를 먼저 읽어라.
->
-> 아래의 "BE가 한다"는 서술은 **"앱의 저장·상태 관리 계층이 한다"** 로 읽는다.
-> 특히 7절의 제안 수락·저장·적용 흐름은 Room을 쓰는 앱 코드의 책임이 된다.
+판정·경계·버전 규칙의 상세 명세다. 코드는 `kotlin_port/src/main/kotlin/com/petox/screentime/` 이고
+앱(FE)이 이 코드를 복사해 폰 안에서 실행한다. **BE는 분석을 호출하지 않는다.**
 
-AI 측 산출물은 **무상태 Python 분석 라이브러리** 하나다.
-HTTP 서버·인증·DB·스케줄러는 포함하지 않는다.
+아래의 "앱이 한다"는 저장·상태 관리 계층(Room 등)의 책임을 뜻한다.
+특히 7절의 제안 수락·저장·적용 흐름은 앱 코드가 맡는다.
 
-## 1. 설치 (테스트·대조용)
+## 1. 호출
 
-```bash
-pip install screentime-0.1.0-py3-none-any.whl
+```kotlin
+val output: AnalysisOutput = analyze(input)          // AnalysisInput → AnalysisOutput
+val json: String = AnalysisJson.encodeOutput(output) // 계약 JSON(snake_case)
 ```
 
-런타임 의존성은 `pydantic>=2.7` 하나다.
+`analyze` 가 유일한 상위 진입점이다. **DB도 시스템 현재 시각도 읽지 않는다.**
+분석 기준 시각은 호출자가 `as_of_ms` 로 넣는다.
+같은 입력과 같은 `rules_version` 은 항상 같은 출력을 반환한다.
 
-## 2. 호출
+## 2. (삭제) 설치
 
-```python
-from screentime import AnalysisInput, AnalysisOutput, analyze
-
-
-def run_analysis(payload: dict) -> dict:
-    request = AnalysisInput.model_validate(payload)
-    result: AnalysisOutput = analyze(request)
-    return result.model_dump(mode="json")
-```
-
-`analyze`가 유일한 상위 진입점이다. 내부 함수(`analyze_week`, `evaluate_mission`,
-`propose_targets`, `render_insights`)도 재사용을 위해 노출되어 있다.
-
-**함수는 DB도 시스템 현재 시각도 읽지 않는다.** 분석 기준 시각은 호출자가 `as_of_ms`로 넣는다.
-같은 입력과 같은 `rules_version`은 항상 같은 출력을 반환한다.
+Python 패키지로 배포하던 시절의 절이다. 번호는 다른 문서의 참조를 위해 남긴다.
 
 ## 3. 단위와 표현
 
@@ -83,7 +65,7 @@ Mission의 `window_start_ms` / `window_end_ms`는 **검사하지 않는다.** �
 
 ## 5. 오류 처리
 
-- 구조·단위·범위 오류 → `pydantic.ValidationError`. 잘못된 입력을 빈 성공 결과로 치환하지 않는다.
+- 구조·단위·범위 오류 → `ValidationException`. 잘못된 입력을 빈 성공 결과로 치환하지 않는다.
 - 데이터 부족 → 예외가 아니라 `week_status: "insufficient_data"` 같은 **정상 결과**다.
 - 사용자 식별자·세션·토큰·HTTP 상태 코드는 이 패키지의 입력이 아니다.
   올바른 사용자의 기록을 조회하고 결과를 사용자에게 연결하는 것은 BE 책임이다.
