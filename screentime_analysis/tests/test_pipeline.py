@@ -122,6 +122,10 @@ def test_two_week_end_to_end(seoul_profile):
     assert result.metrics.valid_days == 7
     assert result.metrics.selected_daily_mean_ms == 100 * MINUTE
     assert result.metrics.selected_night_mean_ms == 20 * MINUTE
+    assert [day.date for day in result.metrics.previous_per_day] == [
+        PREV_WEEK_START + dt.timedelta(days=offset) for offset in range(7)
+    ]
+    assert [day.selected_ms for day in result.metrics.previous_per_day] == [120 * MINUTE] * 7
 
     # 선택 앱은 줄고 비선택 앱은 늘었다.
     assert result.metrics.comparison.comparable is True

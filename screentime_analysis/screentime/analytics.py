@@ -159,13 +159,13 @@ def _build_comparison(current: WeekTotals, previous: WeekTotals, has_previous: b
     )
 
 
-def _day_metrics(request: AnalysisInput) -> list[DayMetrics]:
+def _day_metrics(request: AnalysisInput, week_start: dt.date) -> list[DayMetrics]:
     """per_day는 partial의 확인된 값도 품질과 함께 보여준다."""
     index = index_aggregates(request.aggregates)
     packages = request.target_packages
     rows: list[DayMetrics] = []
 
-    for day in week_dates(request.week_start):
+    for day in week_dates(week_start):
         daily = index.get((day, "daily"))
         pre = index.get((day, "pre_bed"))
         post = index.get((day, "after_bed"))
@@ -291,7 +291,8 @@ def analyze_week(request: AnalysisInput) -> WeeklyMetrics:
         daily_evaluable_count=counts["daily_evaluable"],
         night_success_count=counts["night_success"],
         night_evaluable_count=counts["night_evaluable"],
-        per_day=_day_metrics(request),
+        per_day=_day_metrics(request, request.week_start),
+        previous_per_day=_day_metrics(request, prev_start) if has_previous else [],
         per_app=_app_metrics(request, current, previous, comparison),
         comparison=comparison,
     )

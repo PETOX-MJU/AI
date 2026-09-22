@@ -120,6 +120,7 @@
       }
     ],
     "pre_bed_total_ms": 8400000,
+    "previous_per_day": [],
     "selected_daily_mean_ms": 7200000.0,
     "selected_night_mean_ms": 1800000.0,
     "selected_total_ms": 50400000,

@@ -110,6 +110,7 @@
       }
     ],
     "pre_bed_total_ms": null,
+    "previous_per_day": [],
     "selected_daily_mean_ms": null,
     "selected_night_mean_ms": null,
     "selected_total_ms": null,

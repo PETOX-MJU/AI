@@ -488,6 +488,13 @@
           ],
           "title": "Pre Bed Total Ms"
         },
+        "previous_per_day": {
+          "items": {
+            "$ref": "#/$defs/DayMetrics"
+          },
+          "title": "Previous Per Day",
+          "type": "array"
+        },
         "selected_daily_mean_ms": {
           "anyOf": [
             {
@@ -546,6 +553,7 @@
         "night_success_count",
         "night_evaluable_count",
         "per_day",
+        "previous_per_day",
         "per_app",
         "comparison"
       ],
