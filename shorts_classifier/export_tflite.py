@@ -17,13 +17,12 @@ import tensorflow as tf
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = Path(__file__).resolve().parent / "build"
 CALIB_DIR = ROOT / "datasets" / "split" / "train"
-IMG_SIZE = (224, 224)
 
 
-def representative_dataset(limit: int = 100):
+def representative_dataset(img_size: tuple[int, int], limit: int = 100):
     """양자화 보정용 실제 입력 샘플. 없으면 정확도가 크게 떨어진다."""
     ds = tf.keras.utils.image_dataset_from_directory(
-        CALIB_DIR, image_size=IMG_SIZE, batch_size=1, label_mode=None, shuffle=True
+        CALIB_DIR, image_size=img_size, batch_size=1, label_mode=None, shuffle=True
     )
     for i, batch in enumerate(ds):
         if i >= limit:
@@ -48,7 +47,8 @@ def main() -> None:
     if args.quant == "f16":
         converter.target_spec.supported_types = [tf.float16]
     elif args.quant == "int8":
-        converter.representative_dataset = representative_dataset
+        img_size = tuple(model.input_shape[1:3])  # 입력 크기는 모델이 정한다
+        converter.representative_dataset = lambda: representative_dataset(img_size)
 
     tflite_model = converter.convert()
     out = BUILD / "shorts_classifier.tflite"

@@ -24,7 +24,6 @@ from prepare import session_of
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = Path(__file__).resolve().parent / "build"
 SPLIT = ROOT / "datasets" / "split"
-IMG_SIZE = (224, 224)
 CLASS_NAMES = ("not_shorts", "shorts")
 
 
@@ -33,9 +32,10 @@ def predict_all(model_path: Path, split_dir: Path) -> tuple[np.ndarray, np.ndarr
     interpreter.allocate_tensors()
     inp = interpreter.get_input_details()[0]
     outp = interpreter.get_output_details()[0]
+    img_size = tuple(int(v) for v in inp["shape"][1:3])  # 입력 크기는 모델이 정한다
 
     ds = tf.keras.utils.image_dataset_from_directory(
-        split_dir, image_size=IMG_SIZE, batch_size=1, label_mode="binary", shuffle=False, class_names=CLASS_NAMES
+        split_dir, image_size=img_size, batch_size=1, label_mode="binary", shuffle=False, class_names=CLASS_NAMES
     )
 
     scores, labels = [], []

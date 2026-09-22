@@ -4,7 +4,7 @@
 
     python collect_android.py yt_shorts --seconds 40
     python collect_android.py yt_shorts yt_home yt_search yt_video --repeat 3
-    python collect_android.py ig_reels ig_feed ig_explore ig_stories --repeat 3
+    python collect_android.py ig_reels ig_feed ig_explore ig_stories --repeat 3   # 스토리는 팔로우한 계정이 있어야 한다
 
 저장:  datasets/raw/{라벨}/{기기}_{앱}_{sNN}_{번호}.jpg
 검수:  datasets/review/{기기}_{앱}_{sNN}.jpg — 세션 전체 썸네일. 훑어보고 이상한 세션은 raw 에서 지운다.
@@ -267,18 +267,38 @@ def ig_tab(rid: str) -> Callable[[Device], None]:
     return setup
 
 
+def story_items(d: Device) -> list[Node]:
+    """화면에 보이는 스토리 목록 칸. 내 스토리 칸(추가 배지가 있음)은 누르면 카메라가 열려서 뺀다."""
+    nodes = d.nodes()
+    badges = [n for n in nodes if n.rid == "reel_empty_badge"]
+    items = [n for n in nodes if n.rid == "outer_container" and n.y2 < d.h * 0.35]
+    return [n for n in items if not any(n.x1 <= b.x1 and b.x2 <= n.x2 for b in badges)]
+
+
 def ig_stories_setup(d: Device) -> None:
     ig_tab("feed_tab")(d)
-    tray = sorted((n for n in d.nodes() if n.rid == "outer_container" and n.y2 < d.h * 0.35), key=lambda n: n.x1)
-    if len(tray) < 2:  # 첫 칸은 내 스토리 (누르면 카메라가 열린다)
+    items = story_items(d)
+    if not items:
         raise RuntimeError("볼 수 있는 스토리가 없습니다. 스토리를 올리는 계정을 몇 개 팔로우하세요")
-    d.tap(*tray[1].center)
+    # 스토리는 한 계정이 끝나면 다음 계정으로 이어진다. 세션마다 같은 스토리로 시작하지 않도록
+    # 목록을 옆으로 무작위로 넘기고 보이는 칸 중 하나를 고른다.
+    y = items[0].center[1]
+    for _ in range(random.randint(0, 2)):
+        d.shell(f"input swipe {int(d.w * 0.8)} {y} {int(d.w * 0.2)} {y} 300")
+        time.sleep(1)
+    d.tap(*random.choice(story_items(d) or items).center)
     time.sleep(3)
 
 
 def ig_stories_step(d: Device) -> bool:
-    ok = screen_ok(d.nodes(), want_shorts=False)  # 스토리가 끝나면 피드로 돌아오는데, 피드도 숏폼 아님이라 괜찮다
-    if random.random() < 0.5:
+    nodes = d.nodes()
+    ok = screen_ok(nodes, want_shorts=False)  # 스토리가 끝나면 피드로 돌아오는데, 피드도 숏폼 아님이라 괜찮다
+    if is_shorts(nodes):
+        d.key("BACK")
+        time.sleep(2)
+        return ok
+    # 스토리 뷰어의 id 는 reel_ 로 시작한다. 피드로 돌아온 뒤 오른쪽을 누르면 게시물이 열리므로 누르지 않는다.
+    if any(n.rid.startswith("reel_") for n in nodes) and random.random() < 0.5:
         d.tap(int(d.w * 0.85), d.h // 2)  # 다음 스토리
     wait(2, 4)
     return ok
