@@ -3,7 +3,14 @@
 펫톡스의 **AI 담당 산출물**이다. 사용 시간 집계를 받아 주간 분석, 개인 기준선,
 맞춤 미션 후보, 규칙 기반 판정, 근거 기반 한국어 설명을 돌려주는 **무상태 Python 패키지**다.
 
-HTTP 서버·인증·DB·스케줄러·Android 코드는 포함하지 않는다. BE가 이 패키지를 호출한다.
+HTTP 서버·인증·DB·스케줄러·Android 코드는 포함하지 않는다.
+
+> **이 패키지는 제품에 실려 나가지 않는다.** 분석 로직은 **Kotlin으로 이식해 앱에서 실행**하며,
+> 이 패키지는 **규칙의 정본이자 이식 결과를 대조하는 기준 구현**으로 남는다.
+> `contracts/fixtures.json` 이 parity 테스트의 기준이다.
+> 배경은 [루트 README의 「주간 분석은 앱에서 돈다」](../README.md#주간-분석은-앱에서-돈다) 참고.
+>
+> BE는 이 패키지를 호출하지 않는다. BE 범위는 계정 동기화·백업뿐이다.
 
 ## 설치
 
@@ -63,7 +70,7 @@ python -m screentime --input contracts/examples/complete-week.input.json --outpu
 - 단위는 정수 밀리초, 시각은 UTC epoch milliseconds. 분 변환은 화면에서만 한다
 - 하루를 86,400,000ms로 가정하지 않는다. DST 전환일은 23시간 또는 25시간이다
 - 성공률 분모에서 `unknown`·`in_progress`·`not_applicable`은 제외한다
-- 제안(`Proposal`)은 추천이며 활성 미션이 아니다. 수락·저장·활성화는 BE가 한다
+- 제안(`Proposal`)은 추천이며 활성 미션이 아니다. 수락·저장·활성화는 앱의 저장 계층(Room)이 한다
 
 ## 개발
 
@@ -79,18 +86,20 @@ python -m build
 
 | 파일 | 대상 |
 |---|---|
-| `contracts/be-handoff.md` | BE 담당자 — 설치·호출·필드·오류·버전·책임 경계 |
+| `contracts/kotlin-port.md` | **FE 담당자 — Kotlin 이식 범위·순서·parity 기준** |
 | `contracts/android-data-contract.md` | FE 담당자 — 수집·정규화·품질·경계 정의 |
+| `contracts/be-handoff.md` | 규칙 상세 — 이식 시 참고할 판정·경계·버전 규칙 |
 | `contracts/input.schema.json`, `output.schema.json` | JSON Schema |
 | `contracts/examples/` | 실제 `analyze` 실행으로 만든 입출력 예제 |
-| `contracts/fixtures.json` | FE 로컬 판정 대조용 공통 입력·기대값 |
+| `contracts/fixtures.json` | Kotlin 이식본 대조용 공통 입력·기대값 |
 | `evaluation/report.md` | 검증 결과와 미검증 항목 |
 
 ## 한계 — 반드시 읽을 것
 
 - **설명(`insights`)은 전부 규칙 기반 템플릿이다.** 외부 생성형 AI를 호출하지 않으며
   `source`는 항상 `"template"`이다. 화면에서 AI 생성 결과라고 표시하지 마라.
-  외부 AI 제공자는 아직 선택되지 않았다
+  **이것은 미완성 상태가 아니라 확정된 설계다** — 온디바이스 LLM과 서버 LLM 모두 검토 후
+  기각했다. 사유는 [루트 README의 「온디바이스 LLM」](../README.md#온디바이스-llm--검토했고-도입하지-않는다) 참고
 - **합성 데이터로만 검증했다.** 실제 사용자 행동 개선 효과나 모델 품질을 입증한 것이 아니다
 - **원시 Android 이벤트는 검증하지 않았다.** 이 패키지는 집계 이후의 산술과 경계만 다룬다.
   F13/F14/F15/F22 등은 FE가 실기기에서 확인해야 한다

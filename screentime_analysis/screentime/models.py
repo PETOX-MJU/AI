@@ -262,6 +262,7 @@ class WeeklyMetrics(Strict):
     night_success_count: Count
     night_evaluable_count: Count
     per_day: list[DayMetrics]
+    previous_per_day: list[DayMetrics]
     per_app: list[AppMetrics]
     comparison: Comparison
 
