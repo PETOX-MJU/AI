@@ -4,7 +4,7 @@
 
     python collect_android.py yt_shorts --seconds 40
     python collect_android.py yt_shorts yt_home yt_search yt_video --repeat 3
-    python collect_android.py ig_reels ig_feed ig_explore ig_stories --repeat 3   # 스토리는 팔로우한 계정이 있어야 한다
+    python collect_android.py ig_reels ig_explore ig_stories --repeat 3   # 스토리는 팔로우한 계정이 있어야 한다
 
 저장:  datasets/raw/{라벨}/{기기}_{앱}_{sNN}_{번호}.jpg
 검수:  datasets/review/{기기}_{앱}_{sNN}.jpg — 세션 전체 썸네일. 훑어보고 이상한 세션은 raw 에서 지운다.
@@ -323,25 +323,36 @@ SCENARIOS = {
     "yt_home": Scenario("not_shorts", "yt", YOUTUBE, yt_home_setup, scroll_step),
     "yt_search": Scenario("not_shorts", "yt", YOUTUBE, search, scroll_step),
     "yt_video": Scenario("not_shorts", "yt", YOUTUBE, yt_video_setup, yt_video_step),
-    # DM·프로필은 개인정보가 찍혀서 넣지 않는다. 피드 안에서 자동 재생되는 영상은 숏폼 아님으로 본다.
+    # DM·프로필은 개인정보가 찍혀서 넣지 않는다.
+    # 인스타 홈 피드(ig_feed)는 뺐다. 피드 안 릴스는 숏폼인데(README) 이를 가려낼 화면 표식을 아직 확인하지 못해,
+    # 세션 전체를 숏폼 아님으로 저장하면 릴스가 음성으로 섞인다. 표식을 찾으면 screen_ok 에 넣고 되살린다.
     "ig_reels": Scenario("shorts", "ig", INSTAGRAM, ig_tab("clips_tab"), shorts_step),
-    "ig_feed": Scenario("not_shorts", "ig", INSTAGRAM, ig_tab("feed_tab"), scroll_step),
     "ig_explore": Scenario("not_shorts", "ig", INSTAGRAM, ig_tab("search_tab"), scroll_step),
     "ig_stories": Scenario("not_shorts", "ig", INSTAGRAM, ig_stories_setup, ig_stories_step),
 }
 
 
-def capture(d: Device, package: str, stem: Path, stop: threading.Event, frames: list) -> None:
+def capture(d: Device, package: str, stem: Path, stop: threading.Event, frames: list, errors: list) -> None:
     tick = 0
-    while not stop.is_set():
-        t = time.time()
-        tick += 1  # 저장하지 않은 틱도 번호를 소비해 시간 간격이 파일명에 남는다
-        focus, png = d.focus_and_png()
-        if package in focus and png:
-            path = stem.with_name(f"{stem.name}_{tick:04d}.jpg")
-            Image.open(io.BytesIO(png)).convert("RGB").save(path, quality=95)
-            frames.append((t, path))
-        stop.wait(max(0.0, 1.0 - (time.time() - t)))
+    try:
+        while not stop.is_set():
+            t = time.time()
+            tick += 1  # 저장하지 않은 틱도 번호를 소비해 시간 간격이 파일명에 남는다
+            focus, png = d.focus_and_png()
+            if package in focus and png:
+                path = stem.with_name(f"{stem.name}_{tick:04d}.jpg")
+                Image.open(io.BytesIO(png)).convert("RGB").save(path, quality=95)
+                frames.append((t, path))
+            stop.wait(max(0.0, 1.0 - (time.time() - t)))
+    except Exception as e:  # 스레드 예외는 조용히 사라진다. 세션을 실패로 넘기려고 모아 둔다
+        errors.append(e)
+
+
+def discard(frames: list) -> None:
+    """실패한 세션은 화면 검사를 끝까지 못 했으므로 프레임을 모두 지운다. 라벨이 검증되지 않은 채 raw 에 남으면 안 된다."""
+    for _, path in frames:
+        path.unlink(missing_ok=True)
+    print(f"[실패] 이 세션 프레임 {len(frames)}장을 지웠습니다")
 
 
 def review_sheet(paths: list[Path], out: Path, cols: int = 10, width: int = 108) -> None:
@@ -375,18 +386,25 @@ def run_session(d: Device, device_name: str, key: str, seconds: int, vary: bool)
 
         sc.setup(d)
 
-        frames, stop = [], threading.Event()
+        frames, errors, stop = [], [], threading.Event()
         start = time.time()
-        thread = threading.Thread(target=capture, args=(d, sc.package, out_dir / stem, stop, frames))
+        thread = threading.Thread(target=capture, args=(d, sc.package, out_dir / stem, stop, frames, errors))
         thread.start()
         checks = [(start, True)]
         try:
             while time.time() - start < seconds:
                 t = time.time()
                 checks.append((t, sc.step(d)))
-        finally:
+        except BaseException:
             stop.set()
             thread.join()
+            discard(frames)
+            raise
+        stop.set()
+        thread.join()
+        if errors:
+            discard(frames)
+            raise RuntimeError(f"캡처 실패: {errors[0]!r}")
         end = time.time()
     finally:
         d.shell(f"cmd uimode night {night_before}")
@@ -427,7 +445,7 @@ def main() -> None:
         for key in args.scenarios:
             try:
                 run_session(d, name, key, args.seconds, not args.no_vary)
-            except RuntimeError as e:
+            except (RuntimeError, subprocess.SubprocessError) as e:  # adb 오류·시간 초과도 이 세션만 건너뛴다
                 print(f"[{key}] 건너뜀 — {e}")
     print(f"\n검수: {REVIEW} 의 격자를 훑어보고 이상한 세션은 datasets/raw 에서 지우세요.")
 

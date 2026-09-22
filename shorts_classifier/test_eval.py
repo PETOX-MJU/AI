@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from eval import longest_false_run, smooth
+from eval import best_threshold, longest_false_run, smooth
 
 
 def test_smooth_and_false_run():
@@ -24,6 +24,16 @@ def test_smooth_and_false_run():
     assert longest_false_run(pred, labels, names) == 2
 
 
+def test_best_threshold_between_grid():
+    # 정밀도 95% 는 0.93 이상에서만 나온다 (0.90 격자로는 오탐이 섞인다)
+    scores = np.array([0.91] + [0.93 + 0.001 * i for i in range(19)] + [0.1] * 20)
+    labels = np.array([0] + [1] * 19 + [0] * 20)
+    best = best_threshold(scores, labels)
+    assert np.isclose(best["threshold"], 0.93) and best["fp"] == 0 and best["recall"] == 1.0
+    assert best_threshold(np.array([0.9, 0.9]), np.array([0, 1])) is None
+
+
 if __name__ == "__main__":
     test_smooth_and_false_run()
+    test_best_threshold_between_grid()
     print("OK")

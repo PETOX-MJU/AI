@@ -9,7 +9,7 @@
 
     python eval.py                 # val, 최근 5장
     python eval.py --window 1      # 한 장씩 판정
-    python eval.py --split test    # 잠근 test 세션. 임계값·N 을 정한 뒤 한 번만 본다
+    python eval.py --split test --threshold 0.45 --window 1   # 잠근 test. val 에서 정한 값으로 한 번만 본다
 """
 
 import argparse
@@ -88,7 +88,7 @@ def metrics_at(scores: np.ndarray, labels: np.ndarray, threshold: float) -> dict
     fn = int(np.sum(~pred & (labels == 1)))
     tn = int(np.sum(~pred & (labels == 0)))
     return {
-        "threshold": threshold,
+        "threshold": float(threshold),
         "tp": tp, "fp": fp, "fn": fn, "tn": tn,
         "accuracy": (tp + tn) / len(labels),
         "precision": tp / (tp + fp) if tp + fp else 0.0,
@@ -98,12 +98,23 @@ def metrics_at(scores: np.ndarray, labels: np.ndarray, threshold: float) -> dict
     }
 
 
+def best_threshold(scores: np.ndarray, labels: np.ndarray) -> dict | None:
+    """정밀도 MIN_PRECISION 이상 중 재현율이 가장 높은 임계값. 후보는 관측된 점수 전부라 격자 사이 값도 놓치지 않는다.
+    재현율이 같으면 높은 임계값을 고른다 (오탐 여유)."""
+    safe = [r for r in (metrics_at(scores, labels, t) for t in np.unique(scores)) if r["precision"] >= MIN_PRECISION]
+    return max(safe, key=lambda r: (r["recall"], r["threshold"])) if safe else None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=Path, default=BUILD / "shorts_classifier.tflite")
     parser.add_argument("--split", choices=("val", "test"), default="val")
     parser.add_argument("--window", type=int, default=5, help="최근 몇 장의 평균으로 판정할지")
+    parser.add_argument("--threshold", type=float, help="test 에서 쓸 임계값 (val 에서 정한 값)")
     args = parser.parse_args()
+    # test 에서 임계값을 고르면 test 가 튜닝셋이 된다. val 에서 정한 값만 받는다.
+    if args.split == "test" and args.threshold is None:
+        parser.error("--split test 는 val 에서 정한 --threshold 와 --window 가 필요합니다")
 
     if not args.model.exists():
         raise SystemExit(f"{args.model} 가 없습니다. 먼저 export_tflite.py 를 실행하세요.")
@@ -118,34 +129,39 @@ def main() -> None:
     if n_sessions < 5:
         print("[주의] 세션이 적어 수치가 크게 흔들린다. 장수가 아니라 세션 수가 표본 크기다.\n")
 
-    print(f"{'임계값':>8}{'정밀도':>10}{'재현율':>10}{'오탐률':>10}{'오탐':>8}{'미탐':>8}{'최장오탐':>10}")
-    rows = [metrics_at(scores, labels, t) for t in np.arange(0.3, 0.95, 0.05)]
-    for r in rows:
-        r["run"] = longest_false_run(scores >= r["threshold"], labels, names)
-        print(
-            f"{r['threshold']:>8.2f}{r['precision']:>10.1%}{r['recall']:>10.1%}{r['fpr']:>10.1%}"
-            f"{r['fp']:>8}{r['fn']:>8}{r['run']:>9}장"
+    header = f"{'임계값':>8}{'정밀도':>10}{'재현율':>10}{'오탐률':>10}{'오탐':>8}{'미탐':>8}{'최장오탐':>10}"
+
+    def row(r: dict) -> str:
+        run = longest_false_run(scores >= r["threshold"], labels, names)
+        return (
+            f"{r['threshold']:>8.3f}{r['precision']:>10.1%}{r['recall']:>10.1%}{r['fpr']:>10.1%}"
+            f"{r['fp']:>8}{r['fn']:>8}{run:>9}장"
         )
 
-    # 정밀도 MIN_PRECISION 이상 중 재현율이 가장 높은 임계값.
-    # 90% 로 두면 오탐률 5% 대 임계값이 뽑혔다 — 오탐이 사용자를 쫓아내는 제품이라 95% 로 올렸다.
-    safe = [r for r in rows if r["precision"] >= MIN_PRECISION]
+    if args.split == "test":
+        print(header)
+        print(row(metrics_at(scores, labels, args.threshold)))
+        return
+
+    print(header)
+    for t in np.arange(0.3, 0.95, 0.05):  # 보기용 격자. 추천은 아래에서 관측 점수 전체로 고른다
+        print(row(metrics_at(scores, labels, t)))
+
+    best = best_threshold(scores, labels)
     print("\n" + "=" * 64)
-    if safe:
-        best = max(safe, key=lambda r: r["recall"])
-        print(
-            f"권장 임계값 {best['threshold']:.2f} (최근 {args.window}장 평균) — "
-            f"정밀도 {best['precision']:.1%}, 재현율 {best['recall']:.1%}, 오탐률 {best['fpr']:.1%}, 최장 오탐 {best['run']}장"
-        )
+    if best:
+        print(f"권장 임계값 {best['threshold']:.3f} (최근 {args.window}장 평균)")
+        print(header)
+        print(row(best))
         print(f"앱에는 임계값과 창 크기({args.window})를 함께 넣으세요. 모델을 바꾸면 둘 다 다시 고릅니다.")
+        print(f"최종 판정: python eval.py --split test --threshold {best['threshold']:.3f} --window {args.window}")
         if best["recall"] < 0.80:
             print("\n[주의] 재현율이 80% 미만입니다. 숏폼을 자주 놓칩니다. 데이터를 더 모으세요.")
     else:
         print(f"[실패] 정밀도 {MIN_PRECISION:.0%}를 넘는 임계값이 없습니다.")
         print("이대로 출시하면 엉뚱한 화면에서 캐릭터가 튀어나옵니다.")
         print("→ 데이터를 더 모으거나, 앱 단위 감지(A안)로 후퇴하세요.")
-    if args.split == "val":
-        print("\n이 수치는 모델·임계값을 고른 데이터에서 나온 것이라 낙관적이다. 최종 판정은 --split test 로 한 번만.")
+    print("\n이 수치는 모델·임계값을 고른 데이터에서 나온 것이라 낙관적이다. 최종 판정은 --split test 로 한 번만.")
 
 
 if __name__ == "__main__":

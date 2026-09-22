@@ -17,10 +17,10 @@ python prepare.py              # datasets/raw → datasets/split (train/val, 잠
 python train.py                # 헤드 학습 + 백본 미세조정
 python export_tflite.py        # float16 TFLite 변환 (int8 은 로드 실패가 확인돼 기본값이 아니다)
 python eval.py                 # val 에서 임계값 선택 (최근 5장 평균 판정)
-python eval.py --split test    # 임계값·창 크기를 정한 뒤 최종 판정 한 번
+python eval.py --split test --threshold T --window N   # val 이 추천한 값으로 최종 판정 한 번
 ```
 
-테스트: `python test_prepare.py && python test_eval.py`
+테스트: `python test_prepare.py && python test_eval.py && python test_collect.py`
 
 ### 최종 test 세션 잠그기
 
@@ -67,6 +67,7 @@ python collect_android.py yt_shorts yt_home yt_search yt_video --seconds 40 --re
 `datasets/raw/shorts/` — 유튜브 Shorts, 인스타 Reels, 틱톡 피드 재생 화면.
 **숏폼 위에 댓글창이 열린 화면도 shorts 다** (댓글 읽는 시간도 시청으로 본다). 영상이 넘어가는 중인 프레임은 버린다.
 **피드 안에서 재생되는 릴스도 shorts 다** (인스타 홈 피드에 세로 릴스가 크게 떠서 재생되는 화면).
+그래서 인스타 홈 피드는 자동 수집 시나리오에서 뺐다 (피드 안 릴스를 가려낼 표식이 아직 없다). 직접 녹화하고 구간을 나눠 라벨하라.
 **숏폼 피드 사이의 광고도 shorts 다** (쇼츠·릴스를 넘기다 나오는 광고). 광고는 모양이 달라서 따로 많이 모아야 한다.
 
 `datasets/raw/not_shorts/` — **여기가 중요하다.** 유튜브·인스타·틱톡 **안의** 헷갈리는 화면을 일부러 많이 넣어라:

@@ -23,7 +23,7 @@ from pathlib import Path
 import tensorflow as tf
 
 from collect_android import review_sheet
-from prepare import LABELS, ROOT, group_sessions, load_items, load_test_sessions, session_of
+from prepare import LABELS, ROOT, group_sessions, load_items, load_test_sessions, session_of, split_sessions
 
 WORK = ROOT / "datasets" / "audit_work"
 OUT = ROOT / "datasets" / "review" / "audit"
@@ -42,13 +42,16 @@ def assign_folds(items, k: int, seed: int) -> dict[str, int]:
     return fold
 
 
-def link_split(items, fold: dict[str, int], k: int, root: Path) -> None:
-    """묶음 k 를 val, 나머지를 train 으로 하는 분할을 심볼릭 링크로 만든다. val 은 조기 종료에만 쓴다."""
-    for split in ("train", "val"):
+def link_split(items, fold: dict[str, int], k: int, root: Path, seed: int) -> None:
+    """묶음 k 는 빼 두고(채점만), 나머지로 train/val 분할을 심볼릭 링크로 만든다.
+    val 은 체크포인트·조기 종료에 쓰이므로 채점할 묶음과 겹치면 그 라벨이 모델 선택에 샌다."""
+    rest = [x for x in items if fold[session_of(x[1])] != k]
+    buckets = split_sessions(rest, 0.2, random.Random(seed))
+    for split, split_items in buckets.items():
         for label in LABELS:
             (root / split / label).mkdir(parents=True)
-    for label, p in items:
-        (root / ("val" if fold[session_of(p)] == k else "train") / label / p.name).symlink_to(p)
+        for label, p in split_items:
+            (root / split / label / p.name).symlink_to(p)
 
 
 def score(model: tf.keras.Model, paths: list[Path]) -> list[float]:
@@ -78,7 +81,7 @@ def main() -> None:
     scores = {}
     for k in range(args.folds):
         shutil.rmtree(WORK, ignore_errors=True)
-        link_split(items, fold, k, WORK / "split")
+        link_split(items, fold, k, WORK / "split", args.seed)
         held = [p for _, p in items if fold[session_of(p)] == k]
         print(f"[{k + 1}/{args.folds}] 녹화 {sum(v == k for v in fold.values())}개 ({len(held)}장)를 빼고 학습", flush=True)
         subprocess.run(

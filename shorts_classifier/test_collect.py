@@ -1,9 +1,15 @@
 """python test_collect.py — 수집 스크립트의 기기 없이 도는 부분을 확인한다."""
 
+import io
+import subprocess
 import tempfile
+import time
 from pathlib import Path
 
-from collect_android import bad_intervals, is_shorts, next_session_number, parse_activity_top, parse_nodes, screen_ok
+from PIL import Image
+
+import collect_android
+from collect_android import Scenario, bad_intervals, is_shorts, next_session_number, parse_activity_top, parse_nodes, screen_ok
 
 
 def test_parse_and_marker():
@@ -55,9 +61,37 @@ def test_bad_intervals():
     assert bad_intervals([(0, True), (5, False)], 9) == [(0, 5), (5, 9)]
 
 
+def test_failed_session_leaves_no_frames():
+    buf = io.BytesIO()
+    Image.new("RGB", (4, 8)).save(buf, "PNG")
+
+    class FakeDevice:
+        def shell(self, cmd):
+            return ""
+
+        def focus_and_png(self):
+            return "com.fake/Main", buf.getvalue()
+
+    def step(d):
+        time.sleep(2.5)  # 캡처가 몇 장 찍힐 시간
+        raise subprocess.CalledProcessError(1, "adb")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        collect_android.RAW = Path(tmp) / "raw"
+        collect_android.SCENARIOS["fake"] = Scenario("not_shorts", "ig", "com.fake", lambda d: None, step)
+        try:
+            collect_android.run_session(FakeDevice(), "emu", "fake", 10, vary=False)
+        except subprocess.CalledProcessError:
+            pass
+        else:
+            raise AssertionError("실패가 삼켜졌다")
+        assert not list(collect_android.RAW.rglob("*.jpg"))
+
+
 if __name__ == "__main__":
     test_parse_and_marker()
     test_fallback_and_empty()
     test_next_session_number()
     test_bad_intervals()
+    test_failed_session_leaves_no_frames()
     print("OK")
