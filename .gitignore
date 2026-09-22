@@ -5,8 +5,6 @@ __MACOSX/
 # Claude Code
 .claude/worktrees/
 .claude/settings.local.json
-# oh-my-claudecode 플러그인 상태 파일 (세션마다 생긴다)
-.omc/
 
 # Python
 __pycache__/
