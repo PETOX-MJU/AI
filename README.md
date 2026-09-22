@@ -24,7 +24,7 @@
  ├ 반려동물 사진 → ML Kit Image Labeling      유효성 판별 (Dog/Cat)
  │                → ML Kit Segmentation        배경 제거
  │                → 픽셀화                     색은 원본 사진에서 그대로
- ├ 주간 분석·미션·한 줄 요약                   Kotlin 이식 (Python은 기준 구현)
+ ├ 주간 분석·미션·한 줄 요약                   Kotlin (kotlin_port/)
  └ Room  ─ 사용 로그·코인·캐릭터 성장 (진실의 원천)
 
 [서버 / 선택]  ─ 없어도 앱이 완전히 동작한다
@@ -35,27 +35,22 @@
 
 ### 주간 분석은 앱에서 돈다
 
-`screentime_analysis/` 의 분석 로직은 **Kotlin으로 이식해 앱에서 실행한다.**
-Python 패키지는 배포 경로가 아니라 **판정의 기준 구현(reference implementation)** 으로 남는다.
+주간 분석·미션 판정·한 줄 요약은 **`kotlin_port/` 의 Kotlin 코드가 정본이고 앱에서 실행한다.**
+FE 앱은 이 코드를 그대로 복사해 쓴다(`FE android/app/src/main/java/com/petox/screentime`).
 
-| | 역할 |
-|---|---|
-| `screentime_analysis/` (Python) | 규칙의 정본. 이식 결과를 대조하는 기준 |
-| Kotlin 이식본 | 실제 제품 경로. 앱에서 실행 |
-| `contracts/fixtures.json` | 양쪽이 같은 답을 내는지 검사하는 대조 입력 |
+처음에는 Python으로 규칙을 만들고 Kotlin으로 이식했다. 이식을 끝낸 뒤 Python 패키지는
+같은 규칙을 두 벌 관리하는 부담만 남아 지웠다. 그때 Python 실행값으로 만든 정답 JSON
+(`kotlin_port/contracts/examples/`, `fixtures.json`)은 Kotlin 회귀 테스트로 계속 쓴다.
 
 이유는 설계 원칙 2번과 6번이다. 주간 리포트와 미션은 핵심 기능이므로 서버가 죽어도,
 네트워크가 없어도 동작해야 한다. 중급기 사용자는 네트워크가 불안정한 경우가 많다.
 
 **BE는 분석을 호출하지 않는다.** BE 범위는 계정 동기화와 백업뿐이다.
 
-이식이 끝나기 전까지는 Python 패키지가 유일한 구현이므로, 그 기간의 결과를
-제품 동작으로 간주하지 마라.
-
 ## 온디바이스 LLM — 검토했고 도입하지 않는다
 
 한 줄 요약에 생성형 LLM을 쓰는 안을 검토했으나 **기각했다.** 요약은 계속 규칙 기반
-템플릿(`screentime_analysis/screentime/narratives.py`)으로 간다.
+템플릿(`kotlin_port/src/main/kotlin/com/petox/screentime/Narratives.kt`)으로 간다.
 
 | 방식 | 기각 사유 |
 |---|---|
@@ -73,7 +68,7 @@ Python 패키지는 배포 경로가 아니라 **판정의 기준 구현(referen
 
 | 저장소 | 역할 |
 |---|---|
-| **AI** (여기) | 모델을 **만드는** 코드 — 학습, 평가, 변환 + 분석 규칙의 기준 구현 |
+| **AI** (여기) | 모델을 **만드는** 코드 — 학습, 평가, 변환 + 주간 분석 규칙(Kotlin) |
 | **BE** | 계정 동기화·백업 — FastAPI, PostgreSQL. **분석은 호출하지 않는다** |
 | **FE** | 모델을 **탑재하는** 코드 — 안드로이드 앱, TFLite 번들, 분석 로직 Kotlin 이식 |
 
@@ -82,15 +77,12 @@ Python 패키지는 배포 경로가 아니라 **판정의 기준 구현(referen
 | 디렉터리 | 내용 | 착륙지 |
 |---|---|---|
 | `shorts_classifier/` | 숏폼 화면 판별 (MobileNetV3 → TFLite) | FE |
-| `screentime_analysis/` | 주간 분석·미션·한 줄 요약 규칙 (Python) | FE (Kotlin 이식) |
+| `kotlin_port/` | 주간 분석·미션·한 줄 요약 규칙 (Kotlin) | FE (복사) |
 | `pet_validation/` | 사진 유효성 판별 명세 (ML Kit, 학습 없음) | FE |
 | `pixelart/` | 반려동물 사진 → 픽셀 캐릭터 변환 | FE (Kotlin 이식) |
 | `experiments/` | VLM 베이스라인 — **제품 경로 아님** | 비교용 |
 
 `experiments/` 의 모델은 성능 비교 기준선일 뿐이다. **배포 대상이 아니다.**
-
-`screentime_analysis/` 는 `.whl` 로 배포하지만 그건 테스트·대조용이다.
-**제품에 실려 나가는 것은 Kotlin 이식본이다.**
 
 ## 라이선스
 
@@ -198,8 +190,8 @@ FE 는 릴리스에서 받아 `app/src/main/assets/` 에 넣는다.
 | 항목 | 상태 |
 |---|---|
 | 모델·라이브러리 라이선스 | ✅ 해결 |
-| 분석 로직 Kotlin 이식 | 미착수 — [`kotlin-port.md`](screentime_analysis/contracts/kotlin-port.md) |
-| 이식본 parity 테스트 통과 | 미착수 |
+| 분석 로직 Kotlin 이식 | ✅ 완료 — FE `dashboard` 브랜치에 연결 |
+| 이식본 parity 테스트 통과 | ✅ 104개 통과 (`kotlin_port/`, `./gradlew test`) |
 | 학습 데이터 저작권 | ⚠️ 자체 제작 전략으로 해소 예정 |
 | ImageNet 가중치 회색지대 | ⚠️ 자문 항목 |
 | 플레이스토어 정책 심사 | 미확인 |

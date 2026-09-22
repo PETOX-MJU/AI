@@ -9,12 +9,12 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * `screentime_analysis/contracts/fixtures.json` 의 `night_windows`(F07)·`daily_window_dst`(F21)
+ * `contracts/fixtures.json` 의 `night_windows`(F07)·`daily_window_dst`(F21)
  * 블록을 그대로 옮긴 parity 테스트.
  *
  * 기대값은 JSON 파서 의존성을 피하려고 상수로 박았다. 원본은
- * `screentime_analysis/contracts/fixtures.json` 이고 값이 바뀌면 여기도 같이 고친다.
- * Python 이 정본이다 — 불일치가 나면 Kotlin 을 고친다.
+ * `contracts/fixtures.json` 이고 값이 바뀌면 여기도 같이 고친다.
+ * 기대값은 이식 당시 Python 실행값이다. 규칙을 바꿀 때는 README 「규칙을 바꿀 때」를 따른다.
  */
 class WindowsParityTest {
 

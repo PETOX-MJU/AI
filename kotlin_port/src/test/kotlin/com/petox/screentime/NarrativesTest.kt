@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 /**
  * `narratives.py` parity 테스트.
  *
- * Python 이 정본이다 — 불일치가 나면 Kotlin 을 고친다.
+ * 기대값은 이식 당시 Python 실행값이다. 규칙을 바꿀 때는 README 「규칙을 바꿀 때」를 따른다.
  * 카드 계약: `rotation_seed` 의 `toordinal()`/`toEpochDay()` 오프셋, 회전은 도입부만
  * 바꾸고 evidence·고정 절은 불변, `minutes()` 반올림, `INSUFFICIENT_DATA` 문구 분기.
  */

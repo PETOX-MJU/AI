@@ -29,8 +29,8 @@ class JsonValidationTest {
 
     private fun examplesDir(): File {
         val candidates = listOf(
-            File("../screentime_analysis/contracts/examples"),
-            File("screentime_analysis/contracts/examples"),
+            File("contracts/examples"),
+            File("kotlin_port/contracts/examples"),
         )
         return candidates.firstOrNull { it.isDirectory }
             ?: error("contracts/examples 디렉터리를 찾을 수 없습니다: ${candidates.map { it.absolutePath }}")
