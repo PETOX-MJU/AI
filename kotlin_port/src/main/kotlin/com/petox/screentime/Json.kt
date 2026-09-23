@@ -1,19 +1,19 @@
 package com.petox.screentime
 
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import java.time.LocalDate
+import java.time.format.DateTimeParseException
 
 /**
  * `contracts/examples/` 의 `*.json` 파일과 대조하기 위한 최소 JSON 계층.
@@ -26,8 +26,14 @@ import java.time.LocalDate
 object AnalysisJson {
     private val json = Json { prettyPrint = true }
 
-    fun parseInput(text: String): AnalysisInput =
-        inputFromJson(json.parseToJsonElement(text).asObject("(root)"))
+    fun parseInput(text: String): AnalysisInput {
+        val root = try {
+            json.parseToJsonElement(text)
+        } catch (exc: SerializationException) {
+            throw ValidationException("JSON 형식이 올바르지 않습니다")
+        }
+        return inputFromJson(root.asObject("(root)"))
+    }
 
     fun encodeOutput(output: AnalysisOutput): String {
         val element = outputToJson(output)
@@ -59,21 +65,40 @@ private fun JsonObject.requireElement(key: String): JsonElement =
 /** 키가 있으면 그 값(없으면 null)을 돌려준다. optional 필드(기본값이 있는 필드)용. */
 private fun JsonObject.optionalElement(key: String): JsonElement? = this[key]
 
-private fun JsonObject.requireLong(key: String): Long = requirePrimitive(key).long
+private fun JsonObject.requireLong(key: String): Long = requireElement(key).asLong(key)
 private fun JsonObject.requireLongOrNull(key: String): Long? {
     val element = requireElement(key)
-    return if (element is JsonNull) null else element.asPrimitive(key).long
+    return if (element is JsonNull) null else element.asLong(key)
 }
 
-private fun JsonObject.requireString(key: String): String = requirePrimitive(key).content
+private fun JsonObject.requireString(key: String): String = requireElement(key).asString(key)
 private fun JsonObject.optionalString(key: String): String? {
     val element = optionalElement(key) ?: return null
     if (element is JsonNull) throw ValidationException("$key 는 null일 수 없습니다")
-    return element.asPrimitive(key).content
+    return element.asString(key)
 }
 
-private fun JsonObject.requireBoolean(key: String): Boolean = requirePrimitive(key).boolean
-private fun JsonObject.requireDate(key: String): LocalDate = LocalDate.parse(requireString(key))
+private fun JsonObject.requireDate(key: String): LocalDate = try {
+    LocalDate.parse(requireString(key))
+} catch (exc: DateTimeParseException) {
+    throw ValidationException("$key 는 YYYY-MM-DD 날짜여야 합니다")
+}
+
+// JsonPrimitive 의 .content/.long/.boolean 은 타입을 가리지 않는다("5" → 5L, 5 → "5").
+// 입력 스키마의 type 을 그대로 지키도록 JSON 문자열 여부를 직접 확인한다.
+private fun JsonElement.asString(key: String): String {
+    val primitive = asPrimitive(key)
+    if (!primitive.isString) throw ValidationException("$key 는 문자열이어야 합니다")
+    return primitive.content
+}
+
+/** JSON Schema `integer`: 5 와 5.0 은 받고, "5"·1.5·true·Long 범위 밖은 거부한다. */
+private fun JsonElement.asLong(key: String): Long {
+    val primitive = asPrimitive(key)
+    val value = if (primitive.isString) null else primitive.content.toBigDecimalOrNull()
+    return value?.let { runCatching { it.longValueExact() }.getOrNull() }
+        ?: throw ValidationException("$key 는 정수여야 합니다")
+}
 
 // 타입이 다른 값은 ClassCastException 이 아니라 계약대로 ValidationException 으로 거부한다
 // (rules.md 5절). `as` 캐스트를 직접 쓰지 않는 이유다.
@@ -152,8 +177,8 @@ private fun profileFromJson(obj: JsonObject): Profile {
     return Profile(
         version = obj.requireLong("version"),
         timezone = obj.requireString("timezone"),
-        targetPackages = obj.requireArray("target_packages").map { it.asPrimitive("target_packages").content },
-        purposes = obj.optionalObject("purposes")?.mapValues { (_, v) -> v.asPrimitive("purposes").content }
+        targetPackages = obj.requireArray("target_packages").map { it.asString("target_packages") },
+        purposes = obj.optionalObject("purposes")?.mapValues { (_, v) -> v.asString("purposes") }
             ?: emptyMap(),
         weekdayBed = obj.requireString("weekday_bed"),
         weekdayWake = obj.requireString("weekday_wake"),
@@ -184,7 +209,7 @@ private fun windowAggregateFromJson(obj: JsonObject): WindowAggregate {
         endMs = obj.requireLong("end_ms"),
         observedUntilMs = obj.requireLong("observed_until_ms"),
         quality = Quality.fromWire(obj.requireString("quality")),
-        reasonCodes = obj.optionalArray("reason_codes")?.map { it.asPrimitive("reason_codes").content } ?: emptyList(),
+        reasonCodes = obj.optionalArray("reason_codes")?.map { it.asString("reason_codes") } ?: emptyList(),
         profileVersion = obj.requireLong("profile_version"),
         // apps == null 은 "확인 불가", 빈 배열은 "확인된 0". 키는 필수이고 값만 null일 수 있다.
         apps = obj.requireArrayOrNull("apps")?.map { appDurationFromJson(it.asObject("apps")) },

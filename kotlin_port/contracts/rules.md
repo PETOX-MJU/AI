@@ -67,6 +67,8 @@ Mission의 `window_start_ms` / `window_end_ms`는 **검사하지 않는다.** �
 ## 5. 오류 처리
 
 - 구조·단위·범위 오류 → `ValidationException`. 잘못된 입력을 빈 성공 결과로 치환하지 않는다.
+  JSON 문법 오류, `input.schema.json`과 다른 타입(문자열 자리의 숫자, 정수 자리의 `"5"`·`1.5` 등),
+  잘못된 날짜도 모두 `ValidationException`이다. 다른 예외 타입으로 새지 않는다.
 - 데이터 부족 → 예외가 아니라 `week_status: "insufficient_data"` 같은 **정상 결과**다.
 - 사용자 식별자·세션·토큰은 이 분석기의 입력이 아니다. 어느 사용자의 기록인지는 앱이 관리한다.
 
