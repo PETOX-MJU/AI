@@ -78,10 +78,17 @@ private fun JsonObject.optionalString(key: String): String? {
     return element.asString(key)
 }
 
-private fun JsonObject.requireDate(key: String): LocalDate = try {
-    LocalDate.parse(requireString(key))
-} catch (exc: DateTimeParseException) {
-    throw ValidationException("$key 는 YYYY-MM-DD 날짜여야 합니다")
+// LocalDate.parse 는 "+10000-01-01" 같은 확장 연도도 받으므로 모양을 먼저 확인한다.
+private val DATE_SHAPE = Regex("""\d{4}-\d{2}-\d{2}""")
+
+private fun JsonObject.requireDate(key: String): LocalDate {
+    val raw = requireString(key)
+    return try {
+        if (!DATE_SHAPE.matches(raw)) throw DateTimeParseException("형식 불일치", raw, 0)
+        LocalDate.parse(raw)
+    } catch (exc: DateTimeParseException) {
+        throw ValidationException("$key 는 YYYY-MM-DD 날짜여야 합니다")
+    }
 }
 
 // JsonPrimitive 의 .content/.long/.boolean 은 타입을 가리지 않는다("5" → 5L, 5 → "5").
@@ -110,8 +117,6 @@ private fun JsonElement.asArray(key: String): JsonArray =
 
 private fun JsonElement.asObject(key: String): JsonObject =
     this as? JsonObject ?: throw ValidationException("$key 는 객체여야 합니다")
-
-private fun JsonObject.requirePrimitive(key: String): JsonPrimitive = requireElement(key).asPrimitive(key)
 
 private fun JsonObject.requireArray(key: String): JsonArray = requireElement(key).asArray(key)
 
@@ -234,8 +239,7 @@ private fun missionFromJson(obj: JsonObject): Mission {
 private fun inputFromJson(obj: JsonObject): AnalysisInput {
     obj.rejectUnknownKeys(ANALYSIS_INPUT_KEYS, "analysis_input")
 
-    // Python `Literal["1"]` 대응. schema_version 은 기본값이 있는 optional 필드지만
-    // 값이 오면 반드시 "1" 이어야 한다.
+    // schema_version 은 기본값이 있는 optional 필드지만 값이 오면 반드시 SCHEMA_VERSION 이어야 한다.
     val schemaVersion = obj.optionalString("schema_version") ?: SCHEMA_VERSION
     if (schemaVersion != SCHEMA_VERSION) {
         throw ValidationException("schema_version 은 \"$SCHEMA_VERSION\" 이어야 합니다: $schemaVersion")

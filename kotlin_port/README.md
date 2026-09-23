@@ -15,7 +15,7 @@ cd kotlin_port
 ./gradlew test
 ```
 
-JDK 17만 있으면 된다(Gradle wrapper 포함). 테스트 104개.
+JDK 17만 있으면 된다(Gradle wrapper 포함).
 
 ## 구조
 
