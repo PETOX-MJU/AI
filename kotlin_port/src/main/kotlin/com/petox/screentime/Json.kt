@@ -26,7 +26,8 @@ import java.time.LocalDate
 object AnalysisJson {
     private val json = Json { prettyPrint = true }
 
-    fun parseInput(text: String): AnalysisInput = inputFromJson(json.parseToJsonElement(text).jsonObject)
+    fun parseInput(text: String): AnalysisInput =
+        inputFromJson(json.parseToJsonElement(text).asObject("(root)"))
 
     fun encodeOutput(output: AnalysisOutput): String {
         val element = outputToJson(output)
@@ -61,43 +62,54 @@ private fun JsonObject.optionalElement(key: String): JsonElement? = this[key]
 private fun JsonObject.requireLong(key: String): Long = requirePrimitive(key).long
 private fun JsonObject.requireLongOrNull(key: String): Long? {
     val element = requireElement(key)
-    return if (element is JsonNull) null else (element as JsonPrimitive).long
+    return if (element is JsonNull) null else element.asPrimitive(key).long
 }
 
 private fun JsonObject.requireString(key: String): String = requirePrimitive(key).content
 private fun JsonObject.optionalString(key: String): String? {
     val element = optionalElement(key) ?: return null
     if (element is JsonNull) throw ValidationException("$key 는 null일 수 없습니다")
-    return (element as JsonPrimitive).content
+    return element.asPrimitive(key).content
 }
 
 private fun JsonObject.requireBoolean(key: String): Boolean = requirePrimitive(key).boolean
 private fun JsonObject.requireDate(key: String): LocalDate = LocalDate.parse(requireString(key))
 
-private fun JsonObject.requirePrimitive(key: String): JsonPrimitive = requireElement(key) as JsonPrimitive
+// 타입이 다른 값은 ClassCastException 이 아니라 계약대로 ValidationException 으로 거부한다
+// (rules.md 5절). `as` 캐스트를 직접 쓰지 않는 이유다.
+private fun JsonElement.asPrimitive(key: String): JsonPrimitive =
+    this as? JsonPrimitive ?: throw ValidationException("$key 는 단일 값이어야 합니다")
 
-private fun JsonObject.requireArray(key: String): JsonArray = requireElement(key) as JsonArray
+private fun JsonElement.asArray(key: String): JsonArray =
+    this as? JsonArray ?: throw ValidationException("$key 는 배열이어야 합니다")
+
+private fun JsonElement.asObject(key: String): JsonObject =
+    this as? JsonObject ?: throw ValidationException("$key 는 객체여야 합니다")
+
+private fun JsonObject.requirePrimitive(key: String): JsonPrimitive = requireElement(key).asPrimitive(key)
+
+private fun JsonObject.requireArray(key: String): JsonArray = requireElement(key).asArray(key)
 
 /** 키는 반드시 있어야 하지만 값은 null일 수 있다 (`apps: list[AppDuration] | None`). */
 private fun JsonObject.requireArrayOrNull(key: String): JsonArray? {
     val element = requireElement(key)
-    return if (element is JsonNull) null else element as JsonArray
+    return if (element is JsonNull) null else element.asArray(key)
 }
 
 /** 키가 없으면 null(호출부에서 기본값 적용). 있는데 값이 null이면 타입 오류로 거부한다. */
 private fun JsonObject.optionalArray(key: String): JsonArray? {
     val element = optionalElement(key) ?: return null
     if (element is JsonNull) throw ValidationException("$key 는 null일 수 없습니다")
-    return element as JsonArray
+    return element.asArray(key)
 }
 
-private fun JsonObject.requireObject(key: String): JsonObject = requireElement(key) as JsonObject
+private fun JsonObject.requireObject(key: String): JsonObject = requireElement(key).asObject(key)
 
 /** 키가 없으면 null(호출부에서 기본값 적용). 있는데 값이 null이면 타입 오류로 거부한다. */
 private fun JsonObject.optionalObject(key: String): JsonObject? {
     val element = optionalElement(key) ?: return null
     if (element is JsonNull) throw ValidationException("$key 는 null일 수 없습니다")
-    return element as JsonObject
+    return element.asObject(key)
 }
 
 /**
@@ -140,8 +152,8 @@ private fun profileFromJson(obj: JsonObject): Profile {
     return Profile(
         version = obj.requireLong("version"),
         timezone = obj.requireString("timezone"),
-        targetPackages = obj.requireArray("target_packages").map { (it as JsonPrimitive).content },
-        purposes = obj.optionalObject("purposes")?.mapValues { (_, v) -> (v as JsonPrimitive).content }
+        targetPackages = obj.requireArray("target_packages").map { it.asPrimitive("target_packages").content },
+        purposes = obj.optionalObject("purposes")?.mapValues { (_, v) -> v.asPrimitive("purposes").content }
             ?: emptyMap(),
         weekdayBed = obj.requireString("weekday_bed"),
         weekdayWake = obj.requireString("weekday_wake"),
@@ -172,10 +184,10 @@ private fun windowAggregateFromJson(obj: JsonObject): WindowAggregate {
         endMs = obj.requireLong("end_ms"),
         observedUntilMs = obj.requireLong("observed_until_ms"),
         quality = Quality.fromWire(obj.requireString("quality")),
-        reasonCodes = obj.optionalArray("reason_codes")?.map { (it as JsonPrimitive).content } ?: emptyList(),
+        reasonCodes = obj.optionalArray("reason_codes")?.map { it.asPrimitive("reason_codes").content } ?: emptyList(),
         profileVersion = obj.requireLong("profile_version"),
         // apps == null 은 "확인 불가", 빈 배열은 "확인된 0". 키는 필수이고 값만 null일 수 있다.
-        apps = obj.requireArrayOrNull("apps")?.map { appDurationFromJson(it as JsonObject) },
+        apps = obj.requireArrayOrNull("apps")?.map { appDurationFromJson(it.asObject("apps")) },
         measurementVersion = obj.requireString("measurement_version"),
     )
 }
@@ -209,8 +221,8 @@ private fun inputFromJson(obj: JsonObject): AnalysisInput {
         lastCollectionAttemptMs = obj.requireLongOrNull("last_collection_attempt_ms"),
         weekStart = obj.requireDate("week_start"),
         profile = profileFromJson(obj.requireObject("profile")),
-        aggregates = obj.requireArray("aggregates").map { windowAggregateFromJson(it as JsonObject) },
-        missions = obj.requireArray("missions").map { missionFromJson(it as JsonObject) },
+        aggregates = obj.requireArray("aggregates").map { windowAggregateFromJson(it.asObject("aggregates")) },
+        missions = obj.requireArray("missions").map { missionFromJson(it.asObject("missions")) },
         currentDailyTargetMs = obj.requireLongOrNull("current_daily_target_ms"),
         currentNightTargetMs = obj.requireLongOrNull("current_night_target_ms"),
     )

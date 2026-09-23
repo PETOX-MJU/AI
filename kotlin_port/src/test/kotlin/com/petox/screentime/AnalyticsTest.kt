@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
  *
  * 기대값은 이식 당시 Python 실행값이다. 규칙을 바꿀 때는 README 「규칙을 바꿀 때」를 따른다.
  * 미션 판정 알고리즘([evaluateMission])은 4단계 범위라 이 파일에서는 스텁
- * [MissionEvaluator] 를 주입해 검증한다.
+ * 미션 판정 결과를 직접 만들어 넘겨 검증한다.
  */
 class AnalyticsTest {
 
@@ -130,9 +130,9 @@ class AnalyticsTest {
         return last
     }
 
-    private val noopEvaluator = MissionEvaluator { mission, observed, quality, asOfMs ->
-        MissionResult(mission.id, MissionStatus.UNKNOWN, observed, asOfMs)
-    }
+    /** 판정 로직과 무관하게 지표만 보는 테스트용 결과 (전부 unknown). */
+    private fun noopResults(req: AnalysisInput) =
+        req.missions.map { MissionResult(it.id, MissionStatus.UNKNOWN, null, req.asOfMs) }
 
     // ---- 1. _pct 반올림 경계 (banker's rounding) ----
 
@@ -173,7 +173,7 @@ class AnalyticsTest {
         val previous = fullWeek(p, prevStart, dayApps = { listOf(AppDuration("com.example.video", 0L)) })
         // duration_ms=0 이면 앱 자체가 누적되지 않으므로(딕셔너리에 등장 안 함) 전주 before=0.
         val req = input(p = p, aggregates = current + previous, asOfMs = weekEndMs(p, monday) + 1)
-        val metrics = analyzeWeek(req, noopEvaluator)
+        val metrics = analyzeWeek(req, noopResults(req))
         val app = metrics.perApp.first { it.packageName == "com.example.video" }
         val expectedTotal = 20 * 7 * MINUTE_MS
         assertEquals(expectedTotal, app.totalMs)
@@ -196,7 +196,7 @@ class AnalyticsTest {
             listOf(AppDuration("com.example.video", 10 * MINUTE_MS + extra))
         })
         val req = input(p = p, aggregates = aggregates, asOfMs = weekEndMs(p, monday) + 1)
-        val metrics = analyzeWeek(req, noopEvaluator)
+        val metrics = analyzeWeek(req, noopResults(req))
         val expectedTotal = 10 * 7 * MINUTE_MS + 1
         assertEquals(expectedTotal, metrics.selectedTotalMs)
         assertEquals(expectedTotal.toDouble() / 7.0, metrics.selectedDailyMeanMs)
@@ -214,7 +214,7 @@ class AnalyticsTest {
             listOf(dailyAgg(p, day, apps = listOf(AppDuration("com.example.video", 5 * MINUTE_MS))))
         }
         val req = input(p = p, aggregates = aggregates, asOfMs = weekEndMs(p, monday) + 1)
-        val metrics = analyzeWeek(req, noopEvaluator)
+        val metrics = analyzeWeek(req, noopResults(req))
         assertEquals(6L, metrics.validDays)
         assertNull(metrics.selectedDailyMeanMs)
         assertNull(metrics.selectedNightMeanMs)
@@ -264,7 +264,7 @@ class AnalyticsTest {
         val prevStart = previousWeekStart(monday)
         val previous = fullWeek(p, prevStart, dayApps = { listOf(AppDuration("com.example.abandoned", 5 * MINUTE_MS)) })
         val req = input(p = p, aggregates = current + previous, asOfMs = weekEndMs(p, monday) + 1)
-        val metrics = analyzeWeek(req, noopEvaluator)
+        val metrics = analyzeWeek(req, noopResults(req))
         val names = metrics.perApp.map { it.packageName }
         assertTrue("com.example.abandoned" in names)
         val abandoned = metrics.perApp.first { it.packageName == "com.example.abandoned" }
@@ -280,7 +280,7 @@ class AnalyticsTest {
         val p = profile() // targetPackages = ["com.example.video"]
         val aggregates = fullWeek(p, monday, dayApps = { listOf(AppDuration("com.example.other", 5 * MINUTE_MS)) })
         val req = input(p = p, aggregates = aggregates, asOfMs = weekEndMs(p, monday) + 1)
-        val metrics = analyzeWeek(req, noopEvaluator)
+        val metrics = analyzeWeek(req, noopResults(req))
         val target = metrics.perApp.firstOrNull { it.packageName == "com.example.video" }
         assertTrue(target != null)
         assertEquals(true, target!!.isTarget)
@@ -317,11 +317,8 @@ class AnalyticsTest {
             "in_progress" to MissionStatus.IN_PROGRESS,
             "not_applicable" to MissionStatus.NOT_APPLICABLE,
         )
-        val evaluator = MissionEvaluator { mission, observed, _, asOfMs ->
-            MissionResult(mission.id, statusById.getValue(mission.id), observed, asOfMs)
-        }
         val req = input(p = p, aggregates = emptyList(), missions = missions, asOfMs = weekEndMs(p, monday) + 1)
-        val metrics = analyzeWeek(req, evaluator)
+        val metrics = analyzeWeek(req, req.missions.map { MissionResult(it.id, statusById.getValue(it.id), null, req.asOfMs) })
         // succeeded + failed 만 평가 가능 -> 분모 2, 성공 1
         assertEquals(2L, metrics.dailyEvaluableCount)
         assertEquals(1L, metrics.dailySuccessCount)
@@ -346,11 +343,8 @@ class AnalyticsTest {
             windowEndMs = dailyWindow(day, p).endMs,
         )
         val missions = listOf(mission("prev", prevDay), mission("this", thisDay))
-        val evaluator = MissionEvaluator { mission, observed, _, asOfMs ->
-            MissionResult(mission.id, MissionStatus.SUCCEEDED, observed, asOfMs)
-        }
         val req = input(p = p, aggregates = emptyList(), missions = missions, asOfMs = weekEndMs(p, monday) + 1)
-        val metrics = analyzeWeek(req, evaluator)
+        val metrics = analyzeWeek(req, req.missions.map { MissionResult(it.id, MissionStatus.SUCCEEDED, null, req.asOfMs) })
         // mission_results 에는 둘 다 들어가지만 카운트는 이번 주(this)만.
         assertEquals(1L, metrics.dailyEvaluableCount)
         assertEquals(1L, metrics.dailySuccessCount)
@@ -389,7 +383,7 @@ class AnalyticsTest {
             postApps = { listOf(AppDuration("com.example.video", 600_000L)) },
         )
         val req = input(p = p, aggregates = aggregates, weekStart = weekStart, asOfMs = weekEndMs(p, weekStart) + 1)
-        val metrics = analyzeWeek(req, noopEvaluator)
+        val metrics = analyzeWeek(req, noopResults(req))
 
         // contracts/examples/complete-week.output.json 의 metrics 블록과 대조.
         assertEquals(7L, metrics.validDays)

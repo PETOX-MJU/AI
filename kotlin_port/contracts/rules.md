@@ -17,9 +17,10 @@ val json: String = AnalysisJson.encodeOutput(output) // 계약 JSON(snake_case)
 분석 기준 시각은 호출자가 `as_of_ms` 로 넣는다.
 같은 입력과 같은 `rules_version` 은 항상 같은 출력을 반환한다.
 
-## 2. (삭제) 설치
+## 2. 상태는 분석기가 갖지 않는다
 
-Python 패키지로 배포하던 시절의 절이다. 번호는 다른 문서의 참조를 위해 남긴다.
+`analyze` 는 순수 함수다. 사용 기록 수집, 결과 저장, 미션 발급·수락, 목표 적용은 전부 앱이 한다.
+분석기는 **호출 한 번에 대한 입력만** 보고 결과를 돌려준다.
 
 ## 3. 단위와 표현
 
@@ -67,15 +68,11 @@ Mission의 `window_start_ms` / `window_end_ms`는 **검사하지 않는다.** �
 
 - 구조·단위·범위 오류 → `ValidationException`. 잘못된 입력을 빈 성공 결과로 치환하지 않는다.
 - 데이터 부족 → 예외가 아니라 `week_status: "insufficient_data"` 같은 **정상 결과**다.
-- 사용자 식별자·세션·토큰·HTTP 상태 코드는 이 패키지의 입력이 아니다.
-  올바른 사용자의 기록을 조회하고 결과를 사용자에게 연결하는 것은 BE 책임이다.
+- 사용자 식별자·세션·토큰은 이 분석기의 입력이 아니다. 어느 사용자의 기록인지는 앱이 관리한다.
 
-`ValidationError`를 그대로 클라이언트에 노출하지 마라. 오류 위치(`loc`)와 유형(`type`)만
-전달하고 `input` 필드는 사용자 원본 값이므로 로그에도 남기지 않는 편이 안전하다.
-
-**`loc`에도 사용자 값이 섞인다.** `profile.purposes`는 패키지명을 키로 쓰므로
-`("profile", "purposes", "com.private.app")` 같은 경로가 나온다. 선언된 필드 이름이
-아닌 조각은 가려라. 이 패키지의 CLI는 `_safe_location()`으로 그렇게 처리한다.
+**`ValidationException` 메시지를 화면에 그대로 띄우지 마라.** 메시지에 필드 이름과 값이
+섞인다 — `profile.purposes` 는 패키지명을 키로 쓰므로 사용자가 쓰는 앱 목록이 드러난다.
+로그(logcat)에도 남기지 않는다.
 
 ## 6. week_status
 
@@ -147,10 +144,17 @@ Mission의 `window_start_ms` / `window_end_ms`는 **검사하지 않는다.** �
 
 | 필드 | 뜻 |
 |---|---|
-| `schema_version` | 입출력 계약 버전. 현재 `"1"` |
+| `schema_version` | 입출력 계약 버전. 현재 `"2"` |
 | `rules_version` | 계산·판정 규칙 버전. 바뀌면 결과가 달라질 수 있다 |
 | `profile_version` | 사용자 설정 스냅샷 버전 |
 | `measurement_version` | FE 측정 정의 버전 |
+
+### schema_version 이력
+
+| 버전 | 바뀐 것 |
+|---|---|
+| `"1"` | 최초 계약 |
+| `"2"` | `metrics.previous_per_day` 추가 (필수). 대시보드 그래프가 지난주 일별 값을 다시 계산하지 않도록 출력에 담는다. 스키마가 `additionalProperties: false` 라 v1 소비자는 v2 응답을 거부한다 |
 
 한 요청 안의 모든 집계·미션은 `profile.version`과 같아야 하고 `measurement_version`도 하나여야 한다.
 다른 버전의 보고서는 **당시 Profile로 별도 요청**한다. 과거 보고서를 현재 기준선으로 재사용하지 마라.
@@ -200,13 +204,14 @@ Mission의 `window_start_ms` / `window_end_ms`는 **검사하지 않는다.** �
 
 | 파일 | 내용 |
 |---|---|
-| `input.schema.json` | `AnalysisInput.model_json_schema()` |
-| `output.schema.json` | `AnalysisOutput.model_json_schema()` |
+| `input.schema.json` | `AnalysisInput` JSON Schema |
+| `output.schema.json` | `AnalysisOutput` JSON Schema |
 | `examples/complete-week.*.json` | F01 완전한 주 |
 | `examples/insufficient-data.*.json` | F04 확인 불가한 주 |
-| `fixtures.json` | FE 로컬 판정 대조용 공통 입력·기대값 |
+| `fixtures.json` | 구간 경계·미션 판정 대조용 입력·기대값 |
 
-출력 예제는 **실제 `analyze` 실행값**이다. 손으로 쓴 값이 아니며
-`tests/test_contract_examples.py`가 구현과의 일치를 검사한다.
+출력 예제는 **실제 `analyze` 실행값**이다. 손으로 쓴 값이 아니다.
+`PipelineParityTest` 가 예제와 구현의 일치를, `WindowsParityTest`·`MissionsTest` 가
+`fixtures.json` 의 기대값을 직접 읽어 검사한다.
 
-스키마·예제를 다시 만들려면 위 테스트를 먼저 돌려 현재 구현과 어긋나는지 확인하라.
+예제·스키마를 바꿀 때는 README 「규칙을 바꿀 때」를 따른다.

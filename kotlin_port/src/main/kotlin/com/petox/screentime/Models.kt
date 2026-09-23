@@ -13,7 +13,7 @@ import java.time.zone.ZoneRulesException
  * 데이터가 없다는 이유로 0을 만들지 않는다. 확인 불가는 `null` 이고 확인된 0은 빈 배열이다.
  */
 
-const val SCHEMA_VERSION: String = "1"
+const val SCHEMA_VERSION: String = "2"
 const val RULES_VERSION: String = "2026-09-10.1"
 
 const val MINUTE_MS: Long = 60_000L

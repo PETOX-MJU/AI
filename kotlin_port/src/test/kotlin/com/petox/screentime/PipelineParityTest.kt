@@ -99,9 +99,9 @@ class PipelineParityTest {
     }
 
     @Test
-    fun `schema_version 은 1 이다`() {
+    fun `schema_version 은 2 이다`() {
         val dir = examplesDir()
         val request = AnalysisJson.parseInput(File(dir, "complete-week.input.json").readText())
-        assertEquals("1", analyze(request).schemaVersion)
+        assertEquals("2", analyze(request).schemaVersion)
     }
 }

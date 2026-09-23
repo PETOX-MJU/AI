@@ -165,21 +165,21 @@ class NarrativesTest {
         currentNightTargetMs = currentNightTargetMs,
     )
 
-    private val noopEvaluator = MissionEvaluator { mission, observed, quality, asOfMs ->
-        MissionResult(mission.id, MissionStatus.UNKNOWN, observed, asOfMs)
-    }
+    /** 판정 로직과 무관하게 문장만 보는 테스트용 결과 (전부 unknown). */
+    private fun noopResults(req: AnalysisInput) =
+        req.missions.map { MissionResult(it.id, MissionStatus.UNKNOWN, null, req.asOfMs) }
 
     private fun fullWeekMetrics(p: Profile): WeeklyMetrics {
         val aggregates = weekAggregates(p, monday, dailyMs = 120 * MINUTE_MS, preBedMs = 20 * MINUTE_MS, afterBedMs = 10 * MINUTE_MS)
         val req = input(p, aggregates = aggregates, asOfMs = asOfAfter(monday, p))
-        return analyzeWeek(req, noopEvaluator)
+        return analyzeWeek(req, noopResults(req))
     }
 
     private fun unavailableWeekMetrics(p: Profile): Pair<WeeklyMetrics, Profile> {
         val aggregates = weekAggregates(p, monday, dailyMs = 0L, preBedMs = 0L, afterBedMs = 0L, quality = Quality.UNAVAILABLE)
         val missions = makeMissions(monday, p, dailyTargetMs = 120 * MINUTE_MS, nightTargetMs = 30 * MINUTE_MS)
         val req = input(p, aggregates = aggregates, missions = missions, asOfMs = asOfAfter(monday, p))
-        return analyzeWeek(req, noopEvaluator) to p
+        return analyzeWeek(req, noopResults(req)) to p
     }
 
     private fun twoWeekMetrics(
@@ -192,7 +192,7 @@ class NarrativesTest {
         val aggregates = weekAggregates(p, prevMonday, dailyMs = prevDailyMs, preBedMs = 0L, afterBedMs = 0L, otherDailyMs = otherPrev) +
             weekAggregates(p, monday, dailyMs = thisDailyMs, preBedMs = 0L, afterBedMs = 0L, otherDailyMs = otherThis)
         val req = input(p, aggregates = aggregates, asOfMs = asOfAfter(monday, p))
-        return analyzeWeek(req, noopEvaluator)
+        return analyzeWeek(req, noopResults(req))
     }
 
     companion object {

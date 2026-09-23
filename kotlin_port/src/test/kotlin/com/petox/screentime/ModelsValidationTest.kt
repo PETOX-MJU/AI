@@ -443,7 +443,7 @@ class ModelsValidationTest {
     }
 
     @Test
-    fun `schema_version 은 1 이다`() {
-        assertEquals("1", input().schemaVersion)
+    fun `schema_version 은 2 이다`() {
+        assertEquals("2", input().schemaVersion)
     }
 }

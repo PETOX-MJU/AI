@@ -9,11 +9,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * `contracts/fixtures.json` 의 `night_windows`(F07)·`daily_window_dst`(F21)
- * 블록을 그대로 옮긴 parity 테스트.
- *
- * 기대값은 JSON 파서 의존성을 피하려고 상수로 박았다. 원본은
- * `contracts/fixtures.json` 이고 값이 바뀌면 여기도 같이 고친다.
+ * `contracts/fixtures.json` 의 `night_windows`·`daily_window_dst` 블록을 **직접 읽어** 대조한다.
  * 기대값은 이식 당시 Python 실행값이다. 규칙을 바꿀 때는 README 「규칙을 바꿀 때」를 따른다.
  */
 class WindowsParityTest {
@@ -38,42 +34,48 @@ class WindowsParityTest {
         effectiveFrom = LocalDate.of(2026, 1, 1),
     )
 
-    // ---- fixtures.json: night_windows (F07) ----
+    // ---- fixtures.json: night_windows ----
 
     @Test
-    fun `F07 야간 구간 경계 - Asia Seoul bed 0000 wake 0700`() {
-        val profile = profileIn("Asia/Seoul", bed = "00:00", wake = "07:00")
-        val (preBed, afterBed) = nightWindows(LocalDate.of(2026, 9, 13), profile)
+    fun `night_windows fixtures`() {
+        for (case in Fixtures.cases("night_windows")) {
+            val profile = profileIn(case.str("timezone"), bed = case.str("bed"), wake = case.str("wake"))
+            val (preBed, afterBed) = nightWindows(LocalDate.parse(case.str("anchor_date")), profile)
+            val pre = case.obj("expected_pre_bed")
+            val after = case.obj("expected_after_bed")
 
-        assertEquals(1789309800000L, preBed.startMs, "pre_bed.start_ms")
-        assertEquals(1789311600000L, preBed.endMs, "pre_bed.end_ms")
-        assertEquals(1789311600000L, afterBed.startMs, "after_bed.start_ms")
-        assertEquals(1789336800000L, afterBed.endMs, "after_bed.end_ms")
+            assertEquals(pre.long("start_ms"), preBed.startMs, "${case.id()} pre_bed.start_ms")
+            assertEquals(pre.long("end_ms"), preBed.endMs, "${case.id()} pre_bed.end_ms")
+            assertEquals(after.long("start_ms"), afterBed.startMs, "${case.id()} after_bed.start_ms")
+            assertEquals(after.long("end_ms"), afterBed.endMs, "${case.id()} after_bed.end_ms")
 
-        // expected_local: pre_start 2026-09-13T23:30+09:00, after_end 2026-09-14T07:00+09:00
-        val zone = ZoneId.of("Asia/Seoul")
-        assertEquals(
-            "2026-09-13T23:30+09:00[Asia/Seoul]",
-            java.time.Instant.ofEpochMilli(preBed.startMs).atZone(zone).toString(),
-        )
-        assertEquals(
-            "2026-09-14T07:00+09:00[Asia/Seoul]",
-            java.time.Instant.ofEpochMilli(afterBed.endMs).atZone(zone).toString(),
-        )
+            // expected_local 은 같은 순간을 사람이 읽는 형태로 적어 둔 것이다.
+            val local = case.obj("expected_local")
+            assertEquals(
+                java.time.ZonedDateTime.parse(local.str("pre_start")).toInstant().toEpochMilli(),
+                preBed.startMs,
+                "${case.id()} expected_local.pre_start",
+            )
+            assertEquals(
+                java.time.ZonedDateTime.parse(local.str("after_end")).toInstant().toEpochMilli(),
+                afterBed.endMs,
+                "${case.id()} expected_local.after_end",
+            )
+        }
     }
 
-    // ---- fixtures.json: daily_window_dst (F21) ----
+    // ---- fixtures.json: daily_window_dst ----
 
     @Test
-    fun `F21 봄 전환일은 23시간이다`() {
-        val window = dailyWindow(LocalDate.of(2026, 3, 8), profileIn("America/New_York"))
-        assertEquals(82_800_000L, window.durationMs)
-    }
-
-    @Test
-    fun `F21 가을 전환일은 25시간이다`() {
-        val window = dailyWindow(LocalDate.of(2026, 11, 1), profileIn("America/New_York"))
-        assertEquals(90_000_000L, window.durationMs)
+    fun `daily_window_dst fixtures`() {
+        for (case in Fixtures.cases("daily_window_dst")) {
+            val window = dailyWindow(LocalDate.parse(case.str("date")), profileIn(case.str("timezone")))
+            assertEquals(
+                case.long("expected_duration_ms"),
+                window.durationMs,
+                "${case.id()} ${case.str("date")} 하루 길이",
+            )
+        }
     }
 
     // ---- localize() DST 정책 (windows.py docstring) ----

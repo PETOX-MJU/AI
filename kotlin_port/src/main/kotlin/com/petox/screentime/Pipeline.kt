@@ -13,11 +13,12 @@ package com.petox.screentime
  * 데이터 부족은 예외가 아니라 정상 결과다. [WeekStatus]와 `insights`가 이유를 알린다.
  */
 fun analyze(request: AnalysisInput): AnalysisOutput {
-    val metrics = analyzeWeek(request, defaultMissionEvaluator)
+    val results = missionResults(request)
+    val metrics = analyzeWeek(request, results)
     return AnalysisOutput(
         weekStatus = getWeekStatus(request),
         metrics = metrics,
-        missionResults = missionResults(request, defaultMissionEvaluator),
+        missionResults = results,
         proposals = proposeTargets(request, metrics),
         insights = renderInsights(
             metrics,
