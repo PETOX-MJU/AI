@@ -83,12 +83,15 @@ UsageStatsManager / Room
 |---|---|
 | 분석 수치·상태·문장 | `AnalysisOutput` |
 | 선택 주 (`week_start`) | `metrics.per_day[0].date`. `per_day`는 항상 입력 `week_start`부터 7일이라 첫 날짜가 곧 `week_start`다. 주 끝은 `per_day[6].date` |
-| 마지막 수집 시각 (`last_collection_attempt_ms`) | **출력에 없다.** 분석을 호출한 쪽이 입력에 넣은 값을 스스로 들고 있어야 한다. 현재 `analyzeLastWeek`는 수집과 분석을 한 번에 하며 이 값을 호출 시각(`now`)으로 넣으므로, 화면은 호출이 끝난 시각을 기록해 쓰면 같다. 화면에 표시하는 기능은 미구현 |
+| 마지막 수집 시각 (`last_collection_attempt_ms`) | 입력 값. `null`일 수 있다 |
+| 미션 목록 (`missions[]`) | 입력 값. `mission_results` 해석에 필요하다 (§4.5) |
+| 활성 목표 (`current_daily_target_ms`, `current_night_target_ms`) | 입력 값. `null`일 수 있다 (§4.7) |
 | 앱 이름·아이콘 | `PackageManager` 로컬 조회 (§4.4) |
 | 사용 정보 접근 권한 여부 | 네이티브 `hasUsageAccess()` (§6 1순위) |
 
-수집을 분석과 떼어 따로 돌리게 되면(예: 주기적 수집 후 화면에서 분석만), 마지막 수집 시각은 수집 기록을 저장한
-로컬 저장소에서 읽는다. 그때 이 표를 고친다.
+**입력 값은 분석에 넘긴 값을 그대로 화면까지 보존한다.** 분석 완료 시각·화면 시각 등 다른 값으로 대신하지 않고,
+`null`도 `null`로 넘긴다. 현재 `analyzeLastWeek`는 입력을 네이티브 안에서 만들고 출력만 돌려주므로,
+위 입력 값을 화면에 쓰는 기능을 구현할 때 네이티브가 그 값을 출력과 함께 넘겨야 한다(현재 미구현).
 
 주간 상태는 `analysis.week_status` 하나만 쓴다. 화면 쪽에 복사해 두지 않는다(두 값이 갈라질 수 있다).
 mock은 §1의 예제 JSON(golden)을 그대로 쓴다.
@@ -104,7 +107,7 @@ mock은 §1의 예제 JSON(golden)을 그대로 쓴다.
 | 값 | 사용자 문구 | UI 처리 |
 |---|---|---|
 | `in_progress` | `이번 주 진행 중` | 확보된 값만 표시. 확정 주간 성과처럼 표현하지 않음 |
-| `awaiting_data` | `최근 기록을 확인하는 중` | refresh CTA 제공. 누락값을 0으로 표시하지 않음 |
+| `awaiting_data` | `최근 기록을 확인하는 중` | refresh CTA 제공. 누락값을 0으로 표시하지 않음. 수집 시각 표시는 §6 3순위 |
 | `ready` | `주간 분석 완료` | 분석 구역 표시. 전주 비교는 `comparison.comparable`, 목표 제안은 `proposals`가 비어 있지 않을 때만 표시 — `ready`여도 둘 다 없을 수 있다(`complete-week.output.json`은 `ready`이면서 `comparable=false`) |
 | `insufficient_data` | `분석할 기록이 부족해요` | 확보된 값 + 부족 안내. 자동 목표 제안이 없을 수 있음 |
 
@@ -163,6 +166,15 @@ mock은 §1의 예제 JSON(golden)을 그대로 쓴다.
 
 ### 4.5 `mission_results[]`
 
+`MissionResult`에는 날짜와 종류가 없고, 입력에 넣은 **모든** 미션(이전 주 포함)의 결과가 들어 있다. 표시할 때는:
+
+1. 입력 `missions[]`와 `mission_id` = `id`로 결합한다. 결합되지 않는 결과는 표시하지 않는다.
+2. `anchor_date`가 선택 주(`per_day` 날짜)에 드는 것만 표시한다.
+3. 일일/야간 구분은 결합한 미션의 `kind`로 한다.
+
+성과 요약 숫자(`*_success_count`, `*_evaluable_count`)는 분석기가 이미 선택 주만 세어 두었으므로 그대로 쓴다.
+현재 앱은 미션을 입력에 넣지 않아 `mission_results`가 항상 비어 있다.
+
 | status | 사용자 문구 | 권장 시각 상태 |
 |---|---|---|
 | `in_progress` | `진행 중` | neutral/progress |
@@ -215,6 +227,9 @@ mock은 §1의 예제 JSON(golden)을 그대로 쓴다.
   2. `직접 수정` (`edit`)
   3. `현재 목표 유지` (`keep`)
 - 수락 또는 수정 시 적용 시점을 반드시 보여준다. 이미 시작한 구간에는 소급 적용하지 않는다.
+- 기준선이 부족한 종류는 제안 자체가 빠진다. 제안이 없을 때 문구는 그 종류의 활성 목표(입력 `current_*_target_ms`)로 나눈다.
+  - 활성 목표 있음: `현재 목표를 유지해요`
+  - 활성 목표 `null`: `기록이 더 모이면 목표를 제안해요` — `현재 목표 유지`라고 쓰지 않는다(유지할 목표가 없다)
 
 ---
 
@@ -240,7 +255,7 @@ mock은 §1의 예제 JSON(golden)을 그대로 쓴다.
 |---:|---|---|
 | 1 | 사용 정보 접근 권한 없음 | 사용 정보 접근 안내. 수치 dashboard를 가짜 0으로 채우지 않음 |
 | 2 | 최초 수집 중이며 표시 가능한 값 없음 | loading skeleton + `기록을 불러오는 중` |
-| 3 | `week_status=awaiting_data` | 마지막 수집 시각 + refresh CTA |
+| 3 | `week_status=awaiting_data` | 수집 시각이 있으면 `마지막 수집 N시 M분` + refresh CTA, `null`이면 `아직 기록을 수집하지 않았어요` + 수집 CTA |
 | 4 | `week_status=insufficient_data` | 부족 안내 + 확인된 값만 표시 |
 | 5 | `week_status=in_progress` | 진행 중 배지 + 현재 확보값 |
 | 6 | `week_status=ready` | 완료 dashboard |
@@ -311,12 +326,12 @@ mock은 §1의 예제 JSON(golden)을 그대로 쓴다.
 | D01 | `complete-week.output.json` | ready 전체 화면, **상단 한줄 요약**, 7일 그래프, 앱 2개, 제안 2개. `previous_per_day=[]`라 지난주 선 없음 |
 | D02 | `insufficient-data.output.json` | `INSUFFICIENT_DATA` 한줄 요약, 모든 날짜 unavailable, 0 막대 금지, 부족 안내 중복 방지 |
 | D03 | `week_status=in_progress` | 진행 중 배지, 확정 주간 성과처럼 표현하지 않음 |
-| D04 | `week_status=awaiting_data` | refresh CTA와 마지막 수집 시각 |
+| D04 | `week_status=awaiting_data` | 수집 시각 있음: 마지막 수집 시각 + refresh CTA. 수집 시각 `null`: `아직 기록을 수집하지 않았어요` + 수집 CTA |
 | D05 | comparison `comparable=false` | 증감 화살표·0% 숨김, 비교 데이터 부족 문구 |
 | D06 | 미션 `2 succeeded / 0 failed / 5 unknown` | `2/2 · 확인 불가 5`, `100% 주간 달성` 금지 |
 | D07 | `partial` 하루 + `unavailable` 하루 | 빗금과 빈칸을 서로 구분 |
 | D08 | 앱 이름 조회 실패 | package name fallback + placeholder 아이콘 |
-| D09 | `proposals=[]` | 빈 CTA 영역 제거, 현재 목표 유지 문구 |
+| D09 | `proposals=[]` | 빈 CTA 영역 제거. 활성 목표가 있으면 `현재 목표를 유지해요`, `null`이면 `기록이 더 모이면 목표를 제안해요` |
 | D10 | 목표 수정 후 저장 실패 | 기존 목표 유지, 재시도 제공 |
 | D11 | 사용 정보 접근 없음 | permission 화면, 가짜 사용량 0 금지 |
 | D12 | 큰 글꼴/스크린리더 | 카드·그래프·CTA 순서와 의미 유지 |
