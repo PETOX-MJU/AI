@@ -3,7 +3,7 @@
 import random
 from pathlib import Path
 
-from prepare import one_label_devices, session_of, split_sessions
+from prepare import device_skew, one_label_devices, session_of, split_sessions
 
 
 def frames(session, label, start, n):
@@ -42,7 +42,16 @@ def test_one_label_devices():
     assert one_label_devices(frames("pixel_yt_s03", "shorts", 0, 5) + frames("pixel_ig_s04", "not_shorts", 0, 5)) == {}
 
 
+def test_device_skew_includes_test():
+    both = frames("pixel_yt_s01", "shorts", 0, 5) + frames("pixel_ig_s02", "not_shorts", 0, 5)
+    # 잠근 test 에서 기기로 라벨이 갈린다: emu=숏폼, galaxy=아님
+    split_test = frames("emu_yt_s03", "shorts", 0, 5) + frames("galaxy_yt_s04", "not_shorts", 0, 5)
+    skew = device_skew({"train": both, "val": both, "test": split_test})
+    assert skew == {"test": {"emu": "shorts", "galaxy": "not_shorts"}}
+
+
 if __name__ == "__main__":
     test_split_sessions()
     test_one_label_devices()
+    test_device_skew_includes_test()
     print("OK")

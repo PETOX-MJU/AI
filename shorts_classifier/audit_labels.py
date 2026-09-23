@@ -20,8 +20,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import tensorflow as tf
-
 from collect_android import review_sheet
 from prepare import LABELS, ROOT, group_sessions, load_items, load_test_sessions, session_of, split_sessions
 
@@ -54,7 +52,16 @@ def link_split(items, fold: dict[str, int], k: int, root: Path, seed: int) -> No
             (root / split / label / p.name).symlink_to(p)
 
 
-def score(model: tf.keras.Model, paths: list[Path]) -> list[float]:
+def run_train(cmd: list[str], what: str) -> None:
+    """학습 로그는 길어서 숨기지만, 실패하면 마지막 출력(표준 출력·오류)을 보여 주고 멈춘다."""
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path(__file__).parent)
+    if result.returncode:
+        raise SystemExit(f"{what} 실패 (종료 코드 {result.returncode}). 마지막 출력:\n" + (result.stdout + result.stderr)[-4000:])
+
+
+def score(model, paths: list[Path]) -> list[float]:
+    import tensorflow as tf  # 무거워서 쓰는 곳에서만 불러온다 (테스트는 TensorFlow 없이 돈다)
+
     h, w = model.input_shape[1:3]
     out = []
     for i in range(0, len(paths), 32):
@@ -67,6 +74,8 @@ def score(model: tf.keras.Model, paths: list[Path]) -> list[float]:
 
 
 def main() -> None:
+    import tensorflow as tf
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--folds", type=int, default=4)
     parser.add_argument("--seed", type=int, default=42)
@@ -84,16 +93,10 @@ def main() -> None:
         link_split(items, fold, k, WORK / "split", args.seed)
         held = [p for _, p in items if fold[session_of(p)] == k]
         print(f"[{k + 1}/{args.folds}] 녹화 {sum(v == k for v in fold.values())}개 ({len(held)}장)를 빼고 학습", flush=True)
-        # 학습 로그는 길어서 숨기지만, 실패하면 원인을 보여야 한다
-        result = subprocess.run(
+        run_train(
             [sys.executable, "train.py", "--split-dir", str(WORK / "split"), "--build-dir", str(WORK / "build"), "--seed", str(args.seed)],
-            capture_output=True, text=True, cwd=Path(__file__).parent,
+            f"[{k + 1}/{args.folds}] train.py",
         )
-        if result.returncode:
-            raise SystemExit(
-                f"[{k + 1}/{args.folds}] train.py 실패 (종료 코드 {result.returncode}). 마지막 출력:\n"
-                + (result.stdout + result.stderr)[-4000:]
-            )
         model = tf.keras.models.load_model(WORK / "build" / "best.keras")
         scores.update(zip(held, score(model, held)))
     shutil.rmtree(WORK, ignore_errors=True)

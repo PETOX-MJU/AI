@@ -3,6 +3,7 @@
 import argparse
 import io
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -111,6 +112,61 @@ def test_restore_failure_leaves_no_frames():
     assert "fake" not in collect_android.SCENARIOS
 
 
+def test_zero_frame_session_fails():
+    class OtherAppDevice:  # 대상 앱이 한 번도 앞에 안 뜬다 → 저장되는 프레임이 없다
+        def shell(self, cmd):
+            return ""
+
+        def focus_and_png(self):
+            return "com.other/Main", b""
+
+    raw_before = collect_android.RAW
+    with tempfile.TemporaryDirectory() as tmp:
+        collect_android.RAW = Path(tmp) / "raw"
+        collect_android.SCENARIOS["fake"] = Scenario("shorts", "yt", "com.fake", lambda d: None, lambda d: time.sleep(0.5) or True)
+        try:
+            collect_android.run_session(OtherAppDevice(), "emu", "fake", 1, vary=False)
+        except RuntimeError as e:
+            assert "0장" in str(e)
+        else:
+            raise AssertionError("0장 세션이 성공으로 끝났다")
+        finally:
+            del collect_android.SCENARIOS["fake"]
+            collect_android.RAW = raw_before
+
+
+def run_main(results: list[bool]) -> int | str | None:
+    """세션 결과(True=성공)를 흉내 내 main() 을 돌리고 종료 코드를 돌려준다 (정상 종료면 None)."""
+    outcomes = iter(results)
+
+    def fake_session(*_):
+        if not next(outcomes):
+            raise RuntimeError("실패")
+
+    class FakeDevice:
+        def __init__(self, serial):
+            pass
+
+        def name(self):
+            return "emu"
+
+    saved = collect_android.Device, collect_android.run_session, sys.argv
+    collect_android.Device, collect_android.run_session = FakeDevice, fake_session
+    sys.argv = ["collect_android.py", "yt_shorts", "--repeat", str(len(results))]
+    try:
+        collect_android.main()
+        return None
+    except SystemExit as e:
+        return e.code
+    finally:
+        collect_android.Device, collect_android.run_session, sys.argv = saved
+
+
+def test_all_sessions_failed_exits_nonzero():
+    assert run_main([False, False]) not in (None, 0)
+    assert run_main([False, True]) is None  # 일부 실패는 그 세션만 건너뛴다
+
+
 def test_device_name():
     assert device_name("galaxya54") == "galaxya54"
     for bad in ("../raw", "my_phone", "Galaxy", "a/b", ""):
@@ -128,5 +184,7 @@ if __name__ == "__main__":
     test_bad_intervals()
     test_failed_session_leaves_no_frames()
     test_restore_failure_leaves_no_frames()
+    test_zero_frame_session_fails()
+    test_all_sessions_failed_exits_nonzero()
     test_device_name()
     print("OK")

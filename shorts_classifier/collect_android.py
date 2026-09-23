@@ -422,6 +422,8 @@ def run_session(d: Device, device_name: str, key: str, seconds: int, vary: bool)
             kept.append(path)
     fails = sum(not ok for _, ok in checks)
     print(f"[{stem}] 저장 {len(kept)}장, 버림 {len(frames) - len(kept)}장 (화면 검사 실패 {fails}/{len(checks) - 1})")
+    if not kept:
+        raise RuntimeError("남은 프레임이 0장입니다 (대상 앱이 안 떴거나 화면 검사가 모두 실패)")
     if len(kept) < seconds / 3:
         print(f"[{stem}] [경고] 남은 프레임이 적습니다. 검수 격자를 확인하세요.")
     review_sheet(kept, REVIEW / f"{stem}.jpg")

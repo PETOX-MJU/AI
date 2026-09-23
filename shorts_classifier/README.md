@@ -20,7 +20,7 @@ python eval.py                 # val 에서 임계값 선택 (최근 5장 평균
 python eval.py --split test --threshold T --window N   # val 이 추천한 값으로 최종 판정 한 번
 ```
 
-테스트: `python test_prepare.py && python test_eval.py && python test_collect.py`
+테스트: `python test_prepare.py && python test_eval.py && python test_collect.py && python test_audit.py` (test_eval 만 TensorFlow 가 필요하다)
 
 ### 최종 test 세션 잠그기
 
