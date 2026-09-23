@@ -1,7 +1,11 @@
 """학습된 Keras 모델을 안드로이드용 TFLite로 변환한다.
 
-    python export_tflite.py            # int8 양자화 (기본, 가장 작고 빠름)
-    python export_tflite.py --no-quant # float32
+    python export_tflite.py                # float16 (기본, 약 2MB, float32 와 점수 차 0.01 미만)
+    python export_tflite.py --quant none   # float32
+    python export_tflite.py --quant int8   # 실험용 — 아래 참고
+
+int8 을 기본으로 쓰지 않는 이유: 실제 데이터로 보정한 MobileNetV3 int8 모델이
+TFLite 기본 CPU 가속기(XNNPACK)에서 allocate 에 실패했고, 가속기를 꺼도 점수가 최대 0.24 틀어졌다.
 """
 
 import argparse
@@ -13,13 +17,12 @@ import tensorflow as tf
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = Path(__file__).resolve().parent / "build"
 CALIB_DIR = ROOT / "datasets" / "split" / "train"
-IMG_SIZE = (224, 224)
 
 
-def representative_dataset(limit: int = 100):
+def representative_dataset(img_size: tuple[int, int], limit: int = 100):
     """양자화 보정용 실제 입력 샘플. 없으면 정확도가 크게 떨어진다."""
     ds = tf.keras.utils.image_dataset_from_directory(
-        CALIB_DIR, image_size=IMG_SIZE, batch_size=1, label_mode=None, shuffle=True
+        CALIB_DIR, image_size=img_size, batch_size=1, label_mode=None, shuffle=True
     )
     for i, batch in enumerate(ds):
         if i >= limit:
@@ -30,7 +33,7 @@ def representative_dataset(limit: int = 100):
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=Path, default=BUILD / "best.keras")
-    parser.add_argument("--no-quant", action="store_true")
+    parser.add_argument("--quant", choices=("f16", "none", "int8"), default="f16")
     args = parser.parse_args()
 
     if not args.model.exists():
@@ -39,9 +42,13 @@ def main() -> None:
     model = tf.keras.models.load_model(args.model)
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
 
-    if not args.no_quant:
+    if args.quant != "none":
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
-        converter.representative_dataset = representative_dataset
+    if args.quant == "f16":
+        converter.target_spec.supported_types = [tf.float16]
+    elif args.quant == "int8":
+        img_size = tuple(model.input_shape[1:3])  # 입력 크기는 모델이 정한다
+        converter.representative_dataset = lambda: representative_dataset(img_size)
 
     tflite_model = converter.convert()
     out = BUILD / "shorts_classifier.tflite"
@@ -50,6 +57,7 @@ def main() -> None:
     size_mb = len(tflite_model) / 1024 / 1024
     print(f"변환 완료: {out} ({size_mb:.2f} MB)")
 
+    # 기본 가속기(XNNPACK)로 로드되는지 확인한다. 여기서 실패하면 앱에서도 실패한다.
     interpreter = tf.lite.Interpreter(model_content=tflite_model)
     interpreter.allocate_tensors()
     inp = interpreter.get_input_details()[0]
