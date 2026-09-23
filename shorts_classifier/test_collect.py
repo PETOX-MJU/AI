@@ -1,5 +1,6 @@
 """python test_collect.py — 수집 스크립트의 기기 없이 도는 부분을 확인한다."""
 
+import argparse
 import io
 import subprocess
 import tempfile
@@ -9,7 +10,9 @@ from pathlib import Path
 from PIL import Image
 
 import collect_android
-from collect_android import Scenario, bad_intervals, is_shorts, next_session_number, parse_activity_top, parse_nodes, screen_ok
+from collect_android import (
+    Scenario, bad_intervals, device_name, is_shorts, next_session_number, parse_activity_top, parse_nodes, screen_ok,
+)
 
 
 def test_parse_and_marker():
@@ -108,6 +111,16 @@ def test_restore_failure_leaves_no_frames():
     assert "fake" not in collect_android.SCENARIOS
 
 
+def test_device_name():
+    assert device_name("galaxya54") == "galaxya54"
+    for bad in ("../raw", "my_phone", "Galaxy", "a/b", ""):
+        try:
+            device_name(bad)
+        except argparse.ArgumentTypeError:
+            continue
+        raise AssertionError(f"{bad!r} 가 통과했다")
+
+
 if __name__ == "__main__":
     test_parse_and_marker()
     test_fallback_and_empty()
@@ -115,4 +128,5 @@ if __name__ == "__main__":
     test_bad_intervals()
     test_failed_session_leaves_no_frames()
     test_restore_failure_leaves_no_frames()
+    test_device_name()
     print("OK")

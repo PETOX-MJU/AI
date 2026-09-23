@@ -84,10 +84,16 @@ def main() -> None:
         link_split(items, fold, k, WORK / "split", args.seed)
         held = [p for _, p in items if fold[session_of(p)] == k]
         print(f"[{k + 1}/{args.folds}] 녹화 {sum(v == k for v in fold.values())}개 ({len(held)}장)를 빼고 학습", flush=True)
-        subprocess.run(
+        # 학습 로그는 길어서 숨기지만, 실패하면 원인을 보여야 한다
+        result = subprocess.run(
             [sys.executable, "train.py", "--split-dir", str(WORK / "split"), "--build-dir", str(WORK / "build"), "--seed", str(args.seed)],
-            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=Path(__file__).parent,
+            capture_output=True, text=True, cwd=Path(__file__).parent,
         )
+        if result.returncode:
+            raise SystemExit(
+                f"[{k + 1}/{args.folds}] train.py 실패 (종료 코드 {result.returncode}). 마지막 출력:\n"
+                + (result.stdout + result.stderr)[-4000:]
+            )
         model = tf.keras.models.load_model(WORK / "build" / "best.keras")
         scores.update(zip(held, score(model, held)))
     shutil.rmtree(WORK, ignore_errors=True)

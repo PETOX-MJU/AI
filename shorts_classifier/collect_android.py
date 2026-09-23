@@ -427,13 +427,20 @@ def run_session(d: Device, device_name: str, key: str, seconds: int, vary: bool)
     review_sheet(kept, REVIEW / f"{stem}.jpg")
 
 
+def device_name(value: str) -> str:
+    """--device 는 파일명 첫 조각이자 경로에 들어간다. 경로 문자·"_"(파일명 구분자)가 섞이면 안 된다."""
+    if not re.fullmatch(r"[a-z0-9]+", value):
+        raise argparse.ArgumentTypeError("영문 소문자와 숫자만 쓸 수 있습니다 (예: galaxya54)")
+    return value
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("scenarios", nargs="+", choices=sorted(SCENARIOS))
     parser.add_argument("--seconds", type=int, default=40)
     parser.add_argument("--repeat", type=int, default=1, help="시나리오마다 세션 몇 개")
     parser.add_argument("--serial", help="adb 기기 (여러 대 연결 시)")
-    parser.add_argument("--device", help="파일명의 기기 이름 (기본: 기기에서 읽음)")
+    parser.add_argument("--device", type=device_name, help="파일명의 기기 이름, 영문 소문자·숫자 (기본: 기기에서 읽음)")
     parser.add_argument("--no-vary", action="store_true", help="다크 모드·글자 크기를 바꾸지 않는다")
     parser.add_argument("--seed", type=int)
     args = parser.parse_args()
@@ -441,13 +448,19 @@ def main() -> None:
     random.seed(args.seed)
     d = Device(args.serial)
     name = args.device or d.name()
+    failed = 0
     for _ in range(args.repeat):
         for key in args.scenarios:
             try:
                 run_session(d, name, key, args.seconds, not args.no_vary)
             except (RuntimeError, subprocess.SubprocessError) as e:  # adb 오류·시간 초과도 이 세션만 건너뛴다
+                failed += 1
                 print(f"[{key}] 건너뜀 — {e}")
-    print(f"\n검수: {REVIEW} 의 격자를 훑어보고 이상한 세션은 datasets/raw 에서 지우세요.")
+    total = args.repeat * len(args.scenarios)
+    print(f"\n세션 성공 {total - failed} / 실패 {failed}")
+    if failed == total:
+        raise SystemExit("모든 세션이 실패했습니다. 기기 연결·앱 로그인·화면 언어를 확인하세요.")
+    print(f"검수: {REVIEW} 의 격자를 훑어보고 이상한 세션은 datasets/raw 에서 지우세요.")
 
 
 if __name__ == "__main__":

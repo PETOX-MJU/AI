@@ -128,7 +128,7 @@ def main() -> None:
         if any(count["test", label] == 0 for label in LABELS):
             print("[경고] test 에 한쪽 라벨이 없습니다. 정밀도·재현율 중 하나를 잴 수 없습니다.")
 
-    for split in ("train", "val"):
+    for split in buckets:  # 잠근 test 도 본다. test 에서 기기로 라벨이 갈리면 최종 평가가 부푼다
         if skewed := one_label_devices(buckets[split]):
             lines = ", ".join(f"{device}={label}" for device, label in skewed.items())
             print(f"\n[경고] {split} 에 라벨 한쪽만 있는 기기: {lines}")
