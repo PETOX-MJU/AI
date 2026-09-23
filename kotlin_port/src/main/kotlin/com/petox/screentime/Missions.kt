@@ -191,12 +191,3 @@ private fun proposeOne(
     }
     return current to REASON_MAINTAIN_INSUFFICIENT_SUCCESS
 }
-
-/**
- * `Analytics.kt` 의 [MissionEvaluator] 인터페이스에 이 카드에서 구현한 [evaluateMission] 을
- * 꽂아 넣는 기본 구현체. 3단계에서는 스텁(noop) 평가자를 주입했지만, 4단계에서 실제
- * 판정 알고리즘이 완성됐으므로 `analyzeWeek(request, defaultMissionEvaluator)` 로
- * 전체 파이프라인을 완결시킬 수 있다.
- */
-val defaultMissionEvaluator: MissionEvaluator =
-    MissionEvaluator { mission, observedMs, quality, asOfMs -> evaluateMission(mission, observedMs, quality, asOfMs) }

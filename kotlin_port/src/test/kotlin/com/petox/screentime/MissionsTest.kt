@@ -124,60 +124,44 @@ class MissionsTest {
         windowEndMs = windowEndMs,
     )
 
-    // ---- fixtures.json reduce_target — 4케이스 전부 ----
+    // ---- fixtures.json reduce_target ----
 
     @Test
-    fun `reduce_target fixtures 4케이스`() {
-        assertEquals(6_480_000L, reduceTarget(7_200_000L, 3_600_000L))
-        // F18
-        assertEquals(3_600_000L, reduceTarget(3_900_000L, 3_600_000L))
-        // 60,000 -> 54,000 이 되지만 최소 1분(MINUTE_MS)이라 60,000 이 된다.
-        assertEquals(60_000L, reduceTarget(60_000L, 0L))
-        // F17
-        assertEquals(3_600_000L, reduceTarget(3_600_000L, 3_600_000L))
+    fun `reduce_target fixtures`() {
+        for (case in Fixtures.cases("reduce_target")) {
+            assertEquals(
+                case.long("expected_ms"),
+                reduceTarget(case.long("reference_ms"), case.long("final_goal_ms")),
+                "${case.id()} reference=${case.long("reference_ms")} final=${case.long("final_goal_ms")}",
+            )
+        }
     }
 
-    // ---- fixtures.json mission_judgement — 6케이스 전부 ----
+    // ---- fixtures.json mission_judgement ----
 
     @Test
-    fun `mission_judgement fixtures 6케이스`() {
+    fun `mission_judgement fixtures`() {
         val p = profile()
         val day = monday
         val windowStart = dailyWindow(day, p).startMs
         val windowEnd = dailyWindow(day, p).endMs
-        val acceptedBefore = windowStart - MINUTE_MS
-        val acceptedAfter = windowStart + MINUTE_MS
 
-        // F02: target == observed -> succeeded (경계는 <=)
-        val f02 = mission("F02", day, p, 1_620_000L, acceptedBefore, windowStart, windowEnd)
-        val r02 = evaluateMission(f02, 1_620_000L, Quality.COMPLETE, windowEnd + 1)
-        assertEquals(MissionStatus.SUCCEEDED, r02.status)
+        for (case in Fixtures.cases("mission_judgement")) {
+            // accepted_after_window_start 면 구간 시작 뒤에 수락한 미션이다(→ not_applicable).
+            val accepted = if (case.bool("accepted_after_window_start")) windowStart + MINUTE_MS
+            else windowStart - MINUTE_MS
+            val asOf = if (case.bool("window_closed")) windowEnd + 1 else windowEnd - 1
+            val mission = mission(case.id(), day, p, case.long("target_ms"), accepted, windowStart, windowEnd)
 
-        // F03: 1ms 초과 -> failed
-        val f03 = mission("F03", day, p, 1_620_000L, acceptedBefore, windowStart, windowEnd)
-        val r03 = evaluateMission(f03, 1_620_001L, Quality.COMPLETE, windowEnd + 1)
-        assertEquals(MissionStatus.FAILED, r03.status)
+            val result = evaluateMission(
+                mission,
+                case.longOrNull("observed_ms"),
+                Quality.entries.first { it.wire == case.str("quality") },
+                asOf,
+            )
 
-        // F04: quality unavailable -> unknown
-        val f04 = mission("F04", day, p, 1_620_000L, acceptedBefore, windowStart, windowEnd)
-        val r04 = evaluateMission(f04, null, Quality.UNAVAILABLE, windowEnd + 1)
-        assertEquals(MissionStatus.UNKNOWN, r04.status)
-
-        // F05: observed 0, complete -> succeeded (확인된 0)
-        val f05 = mission("F05", day, p, 1_620_000L, acceptedBefore, windowStart, windowEnd)
-        val r05 = evaluateMission(f05, 0L, Quality.COMPLETE, windowEnd + 1)
-        assertEquals(MissionStatus.SUCCEEDED, r05.status)
-
-        // window_closed=false, 초과 관측값이라도 -> in_progress (failed 아님)
-        val mid = mission("MID", day, p, 1_620_000L, acceptedBefore, windowStart, windowEnd)
-        val rMid = evaluateMission(mid, 5_940_000L, Quality.COMPLETE, windowEnd - 1)
-        assertEquals(MissionStatus.IN_PROGRESS, rMid.status)
-
-        // F16: accepted_after_window_start -> not_applicable (observed/closed 무관)
-        val f16 = mission("F16", day, p, 1_620_000L, acceptedAfter, windowStart, windowEnd)
-        val r16 = evaluateMission(f16, 0L, Quality.COMPLETE, windowEnd + 1)
-        assertEquals(MissionStatus.NOT_APPLICABLE, r16.status)
-        assertNull(r16.observedMs)
+            assertEquals(case.str("expected"), result.status.wire, "${case.id()} 판정")
+        }
     }
 
     // ---- evaluate_mission 경계: 정확히 같으면 succeeded, 1ms 초과면 failed ----

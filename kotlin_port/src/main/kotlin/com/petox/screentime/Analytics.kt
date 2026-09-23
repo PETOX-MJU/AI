@@ -12,10 +12,9 @@ import java.time.LocalDate
  * - 유효 구간이 하나도 없으면 합계는 0이 아니라 `null` 이다.
  * - 평균은 해당 주의 complete 구간이 7개일 때만 반환한다.
  *
- * `missions.py` 는 4단계 범위다. 이 파일은 실제 미션 판정 알고리즘([evaluate_mission])을
- * 직접 옮기지 않고 [MissionEvaluator] 인터페이스로 주입받는다 — 판정 로직(성공/실패/시효 5분기)은
- * 이 카드의 이식 대상이 아니기 때문이다. 다만 "무엇이 관측되었는가"([nightObservation],
- * [observedForMission])는 주간 합계([weekTotals])가 그대로 의존하는 핵심 산술이라 여기서 옮긴다.
+ * 판정 알고리즘 자체([evaluateMission])는 `Missions.kt` 에 있다. 다만 "무엇이 관측되었는가"
+ * ([nightObservation], [observedForMission])는 주간 합계([weekTotals])가 그대로 의존하는
+ * 핵심 산술이라 여기서 다룬다.
  */
 
 const val DAYS_PER_WEEK: Long = 7L
@@ -300,24 +299,14 @@ fun appMetrics(
     return rows
 }
 
-/**
- * Python `missions.evaluate_mission` 이식 인터페이스.
- *
- * 판정 알고리즘(수락 시각·진행 중·확인 불가·성공·실패 5분기)은 `missions.py`의 범위이며
- * 이 카드(3단계)의 이식 대상이 아니다. 4단계에서 이 인터페이스의 실제 구현체를 만든다.
- */
-fun interface MissionEvaluator {
-    fun evaluate(mission: Mission, observedMs: Long?, quality: Quality, asOfMs: Long): MissionResult
-}
-
-/** Python `mission_results`. 입력으로 받은 미션 스냅샷만 판정한다. 미션을 새로 만들지 않는다. */
-fun missionResults(request: AnalysisInput, evaluator: MissionEvaluator): List<MissionResult> {
+/** 입력으로 받은 미션 스냅샷만 판정한다. 미션을 새로 만들지 않는다. */
+fun missionResults(request: AnalysisInput): List<MissionResult> {
     val sorted = request.missions.sortedWith(
         compareBy<Mission> { it.anchorDate }.thenBy { it.kind.wire }.thenBy { it.id }
     )
     return sorted.map { mission ->
         val (observed, quality) = observedForMission(request, mission)
-        evaluator.evaluate(mission, observed, quality, request.asOfMs)
+        evaluateMission(mission, observed, quality, request.asOfMs)
     }
 }
 
@@ -362,8 +351,11 @@ fun missionCounts(results: List<MissionResult>, request: AnalysisInput): Mission
     return MissionCounts(dailySuccess, dailyEvaluable, nightSuccess, nightEvaluable)
 }
 
-/** Python `analyze_week`. 진입점. */
-fun analyzeWeek(request: AnalysisInput, evaluator: MissionEvaluator): WeeklyMetrics {
+/**
+ * 주간 지표. [missionResults] 는 호출자가 이미 계산한 판정 결과다 — 같은 판정을
+ * 두 번 돌리지 않으려고 넘겨받는다 (`analyze` 가 출력에도 그대로 쓴다).
+ */
+fun analyzeWeek(request: AnalysisInput, missionResults: List<MissionResult>): WeeklyMetrics {
     val current = weekTotals(request, request.weekStart)
     val prevStart = previousWeekStart(request.weekStart)
     val prevDates = weekDates(prevStart).toSet()
@@ -371,8 +363,7 @@ fun analyzeWeek(request: AnalysisInput, evaluator: MissionEvaluator): WeeklyMetr
     val previous = if (hasPrevious) weekTotals(request, prevStart) else WeekTotals()
 
     val comparison = buildComparison(current, previous, hasPrevious)
-    val results = missionResults(request, evaluator)
-    val counts = missionCounts(results, request)
+    val counts = missionCounts(missionResults, request)
 
     val fullDays = current.validDays == DAYS_PER_WEEK
     val fullNights = current.validNights == DAYS_PER_WEEK

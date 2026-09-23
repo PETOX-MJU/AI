@@ -1,6 +1,7 @@
 plugins {
+    // 도메인 모델에 @Serializable 을 쓰지 않으므로(Json.kt 수동 매핑) serialization
+    // 컴파일러 플러그인은 필요 없다. JSON 런타임 라이브러리만 쓴다.
     kotlin("jvm") version "2.2.10"
-    kotlin("plugin.serialization") version "2.2.10"
 }
 
 repositories {

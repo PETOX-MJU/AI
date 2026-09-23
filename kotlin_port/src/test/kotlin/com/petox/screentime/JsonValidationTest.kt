@@ -125,23 +125,23 @@ class JsonValidationTest {
     // ---- 5. schema_version="99" → 거부 ----
 
     @Test
-    fun `schema_version 이 1이 아니면 거부한다`() {
+    fun `schema_version 이 2가 아니면 거부한다`() {
         val broken = baseInput().withField("schema_version", JsonPrimitive("99"))
         assertFailsWith<ValidationException> { parse(broken) }
     }
 
     @Test
-    fun `schema_version 이 1이면 통과한다`() {
-        val ok = baseInput().withField("schema_version", JsonPrimitive("1"))
+    fun `schema_version 이 2면 통과한다`() {
+        val ok = baseInput().withField("schema_version", JsonPrimitive("2"))
         val result = parse(ok)
-        assertEquals("1", result.schemaVersion)
+        assertEquals("2", result.schemaVersion)
     }
 
     @Test
-    fun `schema_version 키가 없으면 기본값 1로 통과한다`() {
+    fun `schema_version 키가 없으면 기본값 2로 통과한다`() {
         val ok = baseInput().withoutField("schema_version")
         val result = parse(ok)
-        assertEquals("1", result.schemaVersion)
+        assertEquals("2", result.schemaVersion)
     }
 
     // ---- 추가: 중첩 객체의 required 필드 누락 ----
@@ -179,6 +179,34 @@ class JsonValidationTest {
     @Test
     fun `정상 입력은 여전히 통과한다`() {
         val result = parse(baseInput())
-        assertEquals("1", result.schemaVersion)
+        assertEquals("2", result.schemaVersion)
+    }
+
+    // ---- 타입이 다른 값도 ValidationException 이다 (rules.md 5절) ----
+
+    @Test
+    fun `객체 자리에 배열이 오면 ValidationException 이다`() {
+        val broken = baseInput().withField("profile", JsonArray(emptyList()))
+
+        assertFailsWith<ValidationException> { parse(broken) }
+    }
+
+    @Test
+    fun `숫자 자리에 객체가 오면 ValidationException 이다`() {
+        val broken = baseInput().withField("as_of_ms", JsonObject(emptyMap()))
+
+        assertFailsWith<ValidationException> { parse(broken) }
+    }
+
+    @Test
+    fun `배열 자리에 숫자가 오면 ValidationException 이다`() {
+        val broken = baseInput().withField("aggregates", JsonPrimitive(1))
+
+        assertFailsWith<ValidationException> { parse(broken) }
+    }
+
+    @Test
+    fun `최상위가 객체가 아니면 ValidationException 이다`() {
+        assertFailsWith<ValidationException> { AnalysisJson.parseInput("[]") }
     }
 }
