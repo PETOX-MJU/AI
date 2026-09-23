@@ -16,11 +16,11 @@
 |---|---|
 | 한줄 요약(§4.6), 일별 그래프 `per_day`·`previous_per_day`(§4.3), 선택 앱별 시간·증감(§4.4), 사용 정보 접근 안내(§6 1순위) | 구현됨 — FE `dashboard` 브랜치 `ScreentimeDashboardScreen` |
 | 나머지 §4·§6·§7 규칙 (`week_status` 분기, 야간 그래프, `mission_results` 성과 등) | 표시 규칙만 정의 — 화면 미구현. 현재 화면의 미션 카드는 분석 결과가 아니라 BE `user_missions`를 쓴다 |
-| 주 이동(이전/다음 주), 수동 refresh | **계획 계약 / 미구현** — 현재는 지난 한 주(완료된 주)만 표시 |
-| §3 `WeeklyDashboardRepository`, `DashboardUiState` | **계획 계약 / 미구현** — 현재는 RN이 `AnalysisOutput`을 직접 받는다 |
-| §4.7 제안 CTA, §5 목표 제안 결정 | **계획 계약 / 미구현** |
+| 주 이동(이전/다음 주), 수동 refresh | **미구현** — 현재는 지난 한 주(완료된 주)만 표시 |
+| §4.7 제안 CTA, §5 목표 제안 결정 | **미구현** — 동작 규칙만 정의 |
 
-미구현 구역은 구현할 때 이 문서를 먼저 고친 뒤 코드를 맞춘다.
+화면 상태 객체·repository·결정 저장 DTO 같은 **코드 모양은 이 문서에서 정하지 않는다.**
+저장 방식이 정해지는 실제 구현 PR에서 확정하고, 그때 이 문서에 링크한다.
 
 ---
 
@@ -31,8 +31,7 @@ UsageStatsManager / Room
   → AnalysisInput
   → Kotlin analyze()
   → AnalysisOutput
-  → DashboardMapper (표시용 파생값·앱 이름/아이콘 결합)
-  → DashboardUiState
+  → 앱 이름/아이콘 결합 (PackageManager)
   → 주간 대시보드 화면
 ```
 
@@ -75,87 +74,30 @@ UsageStatsManager / Room
 
 ---
 
-## 3. 화면 조회 API
+## 3. 화면 데이터 흐름
 
-> **계획 계약 / 미구현.** 현재 앱은 네이티브 모듈 `analyzeLastWeek`이 돌려준 `AnalysisOutput`을
-> 화면이 직접 받는다. 아래 인터페이스는 주 이동·제안 결정을 붙일 때의 목표 모양이다.
-> mock은 별도 경로 없이 §1의 예제 JSON(golden)을 그대로 쓴다.
+현재 앱은 네이티브 모듈 `analyzeLastWeek`이 돌려준 `AnalysisOutput`을 화면이 직접 받는다.
+분석 결과에 없는 화면 정보는 다음 두 가지뿐이다.
 
-### 3.1 제품 코드의 논리 인터페이스
+- 앱 이름·아이콘: `PackageManager`로 로컬 조회 (§4.4)
+- 사용 정보 접근 권한 여부 (§6 1순위)
 
-```kotlin
-interface WeeklyDashboardRepository {
-    suspend fun getWeek(weekStart: LocalDate): DashboardUiState
-    suspend fun refresh(weekStart: LocalDate): DashboardUiState
-    suspend fun decideProposal(input: ProposalDecisionInput): ProposalDecisionResult
-}
-```
-
-### 3.2 조회 요청
-
-| 항목 | 타입 | 필수 | 규칙 |
-|---|---|---:|---|
-| `week_start` | `YYYY-MM-DD` | 예 | 월요일이어야 함 |
-| `refresh` | boolean | 아니오 | `true`면 로컬 수집 후 다시 분석. 정확한 완료 시각을 보장하지 않음 |
-
-### 3.3 `DashboardUiState`
-
-`analysis`에는 `AnalysisOutput`이 **통째로** 들어간다(`output.schema.json`, 예:
-`complete-week.output.json`). 아래는 그 바깥에 화면이 덧붙이는 필드만 보여준다.
-
-```json
-{
-  "screen_version": "1",
-  "week": {
-    "week_start": "2026-09-07",
-    "week_end": "2026-09-13",
-    "is_current_week": false,
-    "last_collection_attempt_ms": 1789326000000
-  },
-  "analysis": "<AnalysisOutput — output.schema.json>",
-  "display_apps": {
-    "com.example.video": {
-      "label": "동영상 앱",
-      "icon_key": "package:com.example.video",
-      "purpose_label": "여가"
-    }
-  },
-  "active_targets": {
-    "daily_target_ms": 6480000,
-    "night_target_ms": 1620000,
-    "daily_is_temporary": false,
-    "night_is_temporary": false
-  },
-  "capabilities": {
-    "can_refresh": true,
-    "can_accept_proposal": true,
-    "needs_usage_access": false
-  }
-}
-```
-
-주간 상태는 `analysis.week_status` 하나뿐이다. `week` 안에 복사해 두지 않는다(두 값이 갈라질 수 있다).
+주간 상태는 `analysis.week_status` 하나만 쓴다. 화면 쪽에 복사해 두지 않는다(두 값이 갈라질 수 있다).
+mock은 §1의 예제 JSON(golden)을 그대로 쓴다.
 
 ---
 
 ## 4. 필드 명세와 화면 매핑
 
-### 4.1 `week`
+### 4.1 `analysis.week_status`
 
-| 필드 | 타입 | 화면 의미 |
-|---|---|---|
-| `week_start` | date | 선택 주 월요일 |
-| `week_end` | date | 선택 주 일요일. `week_start + 6일` |
-| `is_current_week` | boolean | 진행 중 배지 및 다음 주 이동 제한 판단 |
-| `last_collection_attempt_ms` | `Long?` | 마지막 수집 시도 시각. `null`이면 "아직 수집하지 않음" |
-
-#### `analysis.week_status`
+상태는 **데이터가 얼마나 모였는지**만 말한다. 비교·제안 표시는 상태가 아니라 각 필드로 따로 분기한다.
 
 | 값 | 사용자 문구 | UI 처리 |
 |---|---|---|
 | `in_progress` | `이번 주 진행 중` | 확보된 값만 표시. 확정 주간 성과처럼 표현하지 않음 |
 | `awaiting_data` | `최근 기록을 확인하는 중` | refresh CTA 제공. 누락값을 0으로 표시하지 않음 |
-| `ready` | `주간 분석 완료` | 모든 분석·비교·제안 구역 표시 가능 |
+| `ready` | `주간 분석 완료` | 분석 구역 표시. 전주 비교는 `comparison.comparable`, 목표 제안은 `proposals`가 비어 있지 않을 때만 표시 — `ready`여도 둘 다 없을 수 있다(`complete-week.output.json`은 `ready`이면서 `comparable=false`) |
 | `insufficient_data` | `분석할 기록이 부족해요` | 확보된 값 + 부족 안내. 자동 목표 제안이 없을 수 있음 |
 
 ### 4.2 `analysis.metrics`
@@ -190,7 +132,7 @@ interface WeeklyDashboardRepository {
 | `complete` | 실선/일반 막대. `0`이면 높이 0인 **확인된 값** |
 | `partial` | 빗금/점선. tooltip에 `일부 기록만 확인됨` |
 | `unavailable` | 빈칸 또는 끊긴 축. **0 높이 막대 금지** |
-| quality 자체가 `null` | 해당 야간 구간이 요청 범위에 없음을 의미. 빈칸 처리 |
+| quality 자체가 `null` | 그 날/구간의 aggregate가 입력에 없음(수집 전, 요청 범위 밖 등). 값도 `null`이다. `unavailable`과 같이 빈칸 처리 |
 
 - 일별 그래프에서 `all_apps_ms`와 `selected_ms`는 겹치지 않는 두 막대로 오해하게 하지 않는다.
   선택 앱은 전체 앱 합계에 포함되는 부분집합이다.
@@ -201,10 +143,10 @@ interface WeeklyDashboardRepository {
 
 표시 우선순위:
 
-1. `display_apps[package_name].label`
+1. `PackageManager`로 조회한 앱 이름
 2. 조회 실패 시 `package_name`
 
-아이콘은 `icon_key`로 로컬 조회한다. 아이콘 조회 실패 시 공통 앱 placeholder를 사용한다.
+아이콘도 `PackageManager`로 로컬 조회한다. 조회 실패 시 공통 앱 placeholder를 사용한다.
 `is_target=true`에는 `관리 중` 배지를 붙일 수 있다.
 
 - `share_pct`: 전체 앱 합계에서 해당 앱의 비중
@@ -255,7 +197,7 @@ interface WeeklyDashboardRepository {
 
 ### 4.7 `proposals[]` (구조: `Proposal`)
 
-> 제안 **데이터**는 분석기가 이미 출력한다. 아래 CTA와 §5 결정 저장은 **계획 계약 / 미구현**이다.
+> 제안 **데이터**는 분석기가 이미 출력한다. 아래 CTA와 §5 결정 저장은 **미구현**이다.
 
 - 제안은 활성 목표가 아니다. 사용자가 선택하기 전까지 현재 미션을 바꾸지 않는다.
 - `kind`: `daily` 또는 `night`
@@ -268,50 +210,13 @@ interface WeeklyDashboardRepository {
 
 ---
 
-## 5. 목표 제안 결정 API
+## 5. 목표 제안 결정 규칙
 
-> **계획 계약 / 미구현.** 저장소(Room 또는 BE `profiles`)가 정해지지 않았다.
+> **미구현.** 요청·응답 모양은 구현 PR에서 정한다. 아래는 어떤 구현이든 지켜야 하는 규칙이다.
 
-### 요청: `ProposalDecisionInput`
-
-```json
-{
-  "basis_week": "2026-09-07",
-  "kind": "daily",
-  "profile_version": 1,
-  "rules_version": "2026-09-10.1",
-  "decision": "accept",
-  "target_ms": 6480000
-}
-```
-
-| 필드 | 타입 | 규칙 |
-|---|---|---|
-| `basis_week` | date | 원 제안과 같아야 함 |
-| `kind` | `daily \| night` | 원 제안과 같아야 함 |
-| `profile_version` | int | 현재 프로필과 같아야 함 |
-| `rules_version` | string | 원 제안과 같아야 함 |
-| `decision` | `accept \| edit \| keep` | 사용자 선택 |
-| `target_ms` | `Long?` | `accept`: 제안값, `edit`: 사용자 수정값, `keep`: `null` |
-
-동일 결정의 중복 저장 방지 키:
-
-```text
-(basis_week, kind, profile_version, rules_version)
-```
-
-### 응답: `ProposalDecisionResult`
-
-```json
-{
-  "saved": true,
-  "decision": "accept",
-  "active_target_ms": 6480000,
-  "effective_from_anchor_date": "2026-09-14",
-  "message": "다음 시작 전 구간부터 적용돼요"
-}
-```
-
+- **저장 정본은 기기 로컬(Room)이다.** BE(`profiles` 등)는 선택적 동기화·백업일 뿐이며, 서버 없이도 결정·적용이 된다.
+- 결정은 `accept`(제안값) / `edit`(사용자 수정값) / `keep`(기존 목표 유지) 셋 중 하나다.
+- 같은 제안에 대한 결정은 한 번만 저장한다. 제안은 `(basis_week, kind, profile_version, rules_version)`으로 식별한다.
 - 월요일 정오에 일일 목표를 수락해도 이미 시작한 월요일 일일 미션은 바뀌지 않는다.
 - 다음 미시작 일일/야간 구간부터 적용한다.
 - `keep`이면 기존 활성 목표를 유지한다.
@@ -325,7 +230,7 @@ interface WeeklyDashboardRepository {
 
 | 순위 | 조건 | 화면 |
 |---:|---|---|
-| 1 | `capabilities.needs_usage_access=true` | 사용 정보 접근 안내. 수치 dashboard를 가짜 0으로 채우지 않음 |
+| 1 | 사용 정보 접근 권한 없음 | 사용 정보 접근 안내. 수치 dashboard를 가짜 0으로 채우지 않음 |
 | 2 | 최초 수집 중이며 표시 가능한 값 없음 | loading skeleton + `기록을 불러오는 중` |
 | 3 | `week_status=awaiting_data` | 마지막 수집 시각 + refresh CTA |
 | 4 | `week_status=insufficient_data` | 부족 안내 + 확인된 값만 표시 |
