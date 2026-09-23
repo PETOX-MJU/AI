@@ -209,4 +209,61 @@ class JsonValidationTest {
     fun `최상위가 객체가 아니면 ValidationException 이다`() {
         assertFailsWith<ValidationException> { AnalysisJson.parseInput("[]") }
     }
+
+    // ---- 입력 스키마의 type·format 을 그대로 지킨다 ----
+
+    private fun JsonObject.withProfileField(key: String, value: JsonElement): JsonObject =
+        withField("profile", getValue("profile").jsonObject.withField(key, value))
+
+    private fun JsonObject.withFirstAggregateField(key: String, value: JsonElement): JsonObject {
+        val aggregates = getValue("aggregates").jsonArray
+        val first = aggregates.first().jsonObject.withField(key, value)
+        return withField("aggregates", JsonArray(listOf(first) + aggregates.drop(1)))
+    }
+
+    @Test
+    fun `문자열 필드에 숫자가 오면 거부한다`() {
+        assertFailsWith<ValidationException> { parse(baseInput().withProfileField("timezone", JsonPrimitive(9))) }
+        assertFailsWith<ValidationException> { parse(baseInput().withField("schema_version", JsonPrimitive(2))) }
+        assertFailsWith<ValidationException> {
+            parse(baseInput().withProfileField("target_packages", JsonArray(listOf(JsonPrimitive(1)))))
+        }
+        assertFailsWith<ValidationException> {
+            parse(baseInput().withFirstAggregateField("reason_codes", JsonArray(listOf(JsonPrimitive(true)))))
+        }
+    }
+
+    @Test
+    fun `정수 필드에 문자열·실수·불리언·범위 밖 값이 오면 거부한다`() {
+        for (bad in listOf(JsonPrimitive("1789326000000"), JsonPrimitive(1.5), JsonPrimitive(true), JsonPrimitive(1e30))) {
+            assertFailsWith<ValidationException>("as_of_ms=$bad") { parse(baseInput().withField("as_of_ms", bad)) }
+        }
+        assertFailsWith<ValidationException> {
+            parse(baseInput().withField("current_daily_target_ms", JsonPrimitive("abc")))
+        }
+    }
+
+    @Test
+    fun `정수 필드의 5·0 같은 소수점 표기는 정수로 받는다`() {
+        val asOf = baseInput().getValue("as_of_ms").toString().toLong()
+        val parsed = parse(baseInput().withField("as_of_ms", JsonPrimitive(asOf.toDouble())))
+        assertEquals(asOf, parsed.asOfMs)
+    }
+
+    @Test
+    fun `날짜 형식이 잘못되면 ValidationException 이다`() {
+        for (bad in listOf("2026-13-01", "2026/09/07", "")) {
+            assertFailsWith<ValidationException>("week_start=$bad") {
+                parse(baseInput().withField("week_start", JsonPrimitive(bad)))
+            }
+        }
+        assertFailsWith<ValidationException> {
+            parse(baseInput().withFirstAggregateField("anchor_date", JsonPrimitive("yesterday")))
+        }
+    }
+
+    @Test
+    fun `JSON 문법이 깨지면 ValidationException 이다`() {
+        assertFailsWith<ValidationException> { AnalysisJson.parseInput("{\"as_of_ms\": ") }
+    }
 }
