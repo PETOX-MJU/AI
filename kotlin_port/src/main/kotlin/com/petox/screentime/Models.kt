@@ -2,7 +2,6 @@ package com.petox.screentime
 
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.zone.ZoneRulesException
 
 /**
  * Python `screentime/models.py` 이식.
@@ -97,11 +96,9 @@ data class Profile(
     init {
         if (version < 0) throw ValidationException("version은 0 이상이어야 합니다")
         if (timezone.isEmpty()) throw ValidationException("timezone이 비어 있습니다")
-        try {
-            ZoneId.of(timezone)
-        } catch (exc: ZoneRulesException) {
-            throw ValidationException("알 수 없는 IANA 시간대입니다: $timezone")
-        } catch (exc: java.time.DateTimeException) {
+        // ZoneId.of 는 "+09:00"·"GMT+9" 같은 고정 오프셋도 받는다. 계약은 IANA 지역 ID 뿐이다
+        // (고정 오프셋은 DST 를 모르므로 야간 구간 계산이 틀어진다).
+        if (timezone !in ZoneId.getAvailableZoneIds()) {
             throw ValidationException("알 수 없는 IANA 시간대입니다: $timezone")
         }
 

@@ -191,7 +191,7 @@ FE 는 릴리스에서 받아 `app/src/main/assets/` 에 넣는다.
 |---|---|
 | 모델·라이브러리 라이선스 | ✅ 해결 |
 | 분석 로직 Kotlin 이식 | ✅ 완료 — FE `dashboard` 브랜치에 연결 |
-| 이식본 parity 테스트 통과 | ✅ 104개 통과 (`kotlin_port/`, `./gradlew test`) |
+| 이식본 parity 테스트 통과 | ✅ 통과 (`kotlin_port/`, `./gradlew test`) |
 | 학습 데이터 저작권 | ⚠️ 자체 제작 전략으로 해소 예정 |
 | ImageNet 가중치 회색지대 | ⚠️ 자문 항목 |
 | 플레이스토어 정책 심사 | 미확인 |

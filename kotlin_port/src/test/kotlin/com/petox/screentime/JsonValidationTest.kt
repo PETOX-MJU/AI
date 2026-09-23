@@ -263,6 +263,40 @@ class JsonValidationTest {
     }
 
     @Test
+    fun `확장 연도 날짜는 YYYY-MM-DD 가 아니므로 거부한다`() {
+        // effective_from 은 다른 검사에 걸리지 않아 날짜 형식 검사만 따로 확인할 수 있다.
+        for (bad in listOf("+10000-01-01", "2026-9-7")) {
+            assertFailsWith<ValidationException>("effective_from=$bad") {
+                parse(baseInput().withProfileField("effective_from", JsonPrimitive(bad)))
+            }
+        }
+    }
+
+    @Test
+    fun `고정 오프셋 시간대는 IANA ID 가 아니므로 거부한다`() {
+        for (bad in listOf("+09:00", "GMT+09:00", "UTC+9", "Z")) {
+            assertFailsWith<ValidationException>("timezone=$bad") {
+                parse(baseInput().withProfileField("timezone", JsonPrimitive(bad)))
+            }
+        }
+    }
+
+    @Test
+    fun `IANA 시간대는 통과한다`() {
+        // 입력 전체를 바꾸면 구간 경계 검사에 걸리므로 Profile 만 만든다.
+        for (ok in listOf("Asia/Seoul", "America/New_York", "UTC")) {
+            val profile = Profile(
+                version = 1, timezone = ok, targetPackages = listOf("com.example.app"),
+                weekdayBed = "23:00", weekdayWake = "07:00", weekendBed = "23:00", weekendWake = "07:00",
+                temporaryDailyMs = 7_200_000, temporaryNightMs = 3_600_000,
+                finalDailyMs = 3_600_000, finalNightMs = 1_800_000,
+                effectiveFrom = java.time.LocalDate.of(2026, 1, 1),
+            )
+            assertEquals(ok, profile.timezone)
+        }
+    }
+
+    @Test
     fun `JSON 문법이 깨지면 ValidationException 이다`() {
         assertFailsWith<ValidationException> { AnalysisJson.parseInput("{\"as_of_ms\": ") }
     }
