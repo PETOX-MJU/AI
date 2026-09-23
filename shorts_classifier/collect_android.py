@@ -375,43 +375,43 @@ def run_session(d: Device, device_name: str, key: str, seconds: int, vary: bool)
 
     night_before = "yes" if "yes" in d.shell("cmd uimode night") else "no"
     font_before = d.shell("settings get system font_scale").strip()
+    frames, errors, stop = [], [], threading.Event()
+    thread = None
+    # 어디서 실패하든(시나리오, 캡처, 설정 복원의 adb 오류) 화면 검사로 거르기 전의 프레임을 raw 에 남기지 않는다.
     try:
-        if vary:
-            night, font = random.choice(["yes", "no"]), random.choice(["0.85", "1.0", "1.15", "1.3"])
-            d.shell(f"cmd uimode night {night}")
-            d.shell(f"settings put system font_scale {font}")
-            print(f"[{stem}] {key} → {sc.label}  다크모드 {night}, 글자 {font}")
-        else:
-            print(f"[{stem}] {key} → {sc.label}")
-
-        sc.setup(d)
-
-        frames, errors, stop = [], [], threading.Event()
-        start = time.time()
-        thread = threading.Thread(target=capture, args=(d, sc.package, out_dir / stem, stop, frames, errors))
-        thread.start()
-        checks = [(start, True)]
         try:
+            if vary:
+                night, font = random.choice(["yes", "no"]), random.choice(["0.85", "1.0", "1.15", "1.3"])
+                d.shell(f"cmd uimode night {night}")
+                d.shell(f"settings put system font_scale {font}")
+                print(f"[{stem}] {key} → {sc.label}  다크모드 {night}, 글자 {font}")
+            else:
+                print(f"[{stem}] {key} → {sc.label}")
+
+            sc.setup(d)
+
+            start = time.time()
+            thread = threading.Thread(target=capture, args=(d, sc.package, out_dir / stem, stop, frames, errors))
+            thread.start()
+            checks = [(start, True)]
             while time.time() - start < seconds:
                 t = time.time()
                 checks.append((t, sc.step(d)))
-        except BaseException:
+            end = time.time()
+        finally:
             stop.set()
-            thread.join()
-            discard(frames)
-            raise
-        stop.set()
-        thread.join()
+            if thread:
+                thread.join()
+            d.shell(f"cmd uimode night {night_before}")
+            if font_before in ("", "null"):
+                d.shell("settings delete system font_scale")
+            else:
+                d.shell(f"settings put system font_scale {font_before}")
         if errors:
-            discard(frames)
             raise RuntimeError(f"캡처 실패: {errors[0]!r}")
-        end = time.time()
-    finally:
-        d.shell(f"cmd uimode night {night_before}")
-        if font_before in ("", "null"):
-            d.shell("settings delete system font_scale")
-        else:
-            d.shell(f"settings put system font_scale {font_before}")
+    except BaseException:
+        discard(frames)
+        raise
 
     bad = bad_intervals(checks, end)
     kept = []

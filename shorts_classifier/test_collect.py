@@ -61,31 +61,51 @@ def test_bad_intervals():
     assert bad_intervals([(0, True), (5, False)], 9) == [(0, 5), (5, 9)]
 
 
-def test_failed_session_leaves_no_frames():
+def run_failing_session(step, fail_restore: bool = False) -> list[Path]:
+    """가짜 기기로 세션을 돌려 adb 오류로 실패시키고, raw 에 남은 프레임을 돌려준다. 모듈 전역은 되돌린다."""
     buf = io.BytesIO()
     Image.new("RGB", (4, 8)).save(buf, "PNG")
 
     class FakeDevice:
         def shell(self, cmd):
+            if fail_restore and cmd.startswith("settings delete"):  # 캡처가 끝난 뒤 설정 복원에서 실패
+                raise subprocess.CalledProcessError(1, "adb")
             return ""
 
         def focus_and_png(self):
             return "com.fake/Main", buf.getvalue()
 
-    def step(d):
-        time.sleep(2.5)  # 캡처가 몇 장 찍힐 시간
-        raise subprocess.CalledProcessError(1, "adb")
-
+    raw_before = collect_android.RAW
     with tempfile.TemporaryDirectory() as tmp:
         collect_android.RAW = Path(tmp) / "raw"
         collect_android.SCENARIOS["fake"] = Scenario("not_shorts", "ig", "com.fake", lambda d: None, step)
         try:
-            collect_android.run_session(FakeDevice(), "emu", "fake", 10, vary=False)
+            collect_android.run_session(FakeDevice(), "emu", "fake", 3, vary=False)
         except subprocess.CalledProcessError:
             pass
         else:
             raise AssertionError("실패가 삼켜졌다")
-        assert not list(collect_android.RAW.rglob("*.jpg"))
+        finally:
+            del collect_android.SCENARIOS["fake"]
+            collect_android.RAW, raw = raw_before, collect_android.RAW
+        return list(raw.rglob("*.jpg"))
+
+
+def test_failed_session_leaves_no_frames():
+    def step(d):
+        time.sleep(2.5)  # 캡처가 몇 장 찍힐 시간
+        raise subprocess.CalledProcessError(1, "adb")
+
+    assert not run_failing_session(step)
+
+
+def test_restore_failure_leaves_no_frames():
+    def step(d):
+        time.sleep(1)
+        return False  # 화면 검사 실패 → 원래는 거를 프레임. 거르기 전에 설정 복원이 실패한다
+
+    assert not run_failing_session(step, fail_restore=True)
+    assert "fake" not in collect_android.SCENARIOS
 
 
 if __name__ == "__main__":
@@ -94,4 +114,5 @@ if __name__ == "__main__":
     test_next_session_number()
     test_bad_intervals()
     test_failed_session_leaves_no_frames()
+    test_restore_failure_leaves_no_frames()
     print("OK")

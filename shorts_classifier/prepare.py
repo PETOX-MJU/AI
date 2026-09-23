@@ -64,6 +64,15 @@ def group_sessions(items: list[Item]) -> tuple[dict[str, list[Item]], dict[tuple
     return sessions, groups
 
 
+def one_label_devices(items: list[Item]) -> dict[str, str]:
+    """라벨 한쪽만 가진 기기 → 그 라벨. 이런 기기가 섞이면 모델이 화면 내용 대신 기기 모양(해상도·상태바)으로
+    라벨을 맞힌다 (예전에 겪은 기기 지름길). 분할은 기기를 모르므로 여기서 따로 잡는다."""
+    labels = defaultdict(set)
+    for label, p in items:
+        labels[p.stem.split("_")[0]].add(label)
+    return {device: next(iter(found)) for device, found in sorted(labels.items()) if len(found) == 1}
+
+
 def split_sessions(items: list[Item], val_ratio: float, rng: random.Random) -> dict[str, list[Item]]:
     sessions, groups = group_sessions(items)
     buckets = {"val": [], "train": []}
@@ -118,6 +127,12 @@ def main() -> None:
         print(f"\ntest 로 잠근 세션: {', '.join(sorted(test_sessions))}")
         if any(count["test", label] == 0 for label in LABELS):
             print("[경고] test 에 한쪽 라벨이 없습니다. 정밀도·재현율 중 하나를 잴 수 없습니다.")
+
+    for split in ("train", "val"):
+        if skewed := one_label_devices(buckets[split]):
+            lines = ", ".join(f"{device}={label}" for device, label in skewed.items())
+            print(f"\n[경고] {split} 에 라벨 한쪽만 있는 기기: {lines}")
+            print("모델이 기기 모양으로 라벨을 맞힐 수 있습니다. 그 기기에서 반대 라벨 녹화를 더 모으세요.")
 
     ratio = count["train", "shorts"] / max(1, count["train", "not_shorts"])
     if not 0.5 <= ratio <= 2.0:

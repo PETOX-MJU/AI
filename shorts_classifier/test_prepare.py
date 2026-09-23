@@ -3,7 +3,7 @@
 import random
 from pathlib import Path
 
-from prepare import session_of, split_sessions
+from prepare import one_label_devices, session_of, split_sessions
 
 
 def frames(session, label, start, n):
@@ -32,6 +32,17 @@ def test_split_sessions():
         assert {lab for lab, p in b["train"] if "_yt_" in p.name} == {"shorts", "not_shorts"}
 
 
+def test_one_label_devices():
+    # emu 는 숏폼만, galaxy 는 아님만 → 둘 다 기기로 라벨을 맞힐 수 있다. pixel 은 양쪽이 있어 괜찮다
+    items = (
+        frames("emu_yt_s01", "shorts", 0, 5) + frames("galaxy_yt_s02", "not_shorts", 0, 5)
+        + frames("pixel_yt_s03", "shorts", 0, 5) + frames("pixel_ig_s04", "not_shorts", 0, 5)
+    )
+    assert one_label_devices(items) == {"emu": "shorts", "galaxy": "not_shorts"}
+    assert one_label_devices(frames("pixel_yt_s03", "shorts", 0, 5) + frames("pixel_ig_s04", "not_shorts", 0, 5)) == {}
+
+
 if __name__ == "__main__":
     test_split_sessions()
+    test_one_label_devices()
     print("OK")

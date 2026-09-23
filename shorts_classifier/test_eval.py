@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from eval import best_threshold, longest_false_run, smooth
+from eval import MIN_PRECISION, best_threshold, longest_false_run, metrics_at, smooth, threshold_text
 
 
 def test_smooth_and_false_run():
@@ -33,7 +33,20 @@ def test_best_threshold_between_grid():
     assert best_threshold(np.array([0.9, 0.9]), np.array([0, 1])) is None
 
 
+def test_threshold_text_keeps_precision():
+    # 리뷰 재현 사례: 0.45049 에서는 정밀도 100% 지만 0.450 으로 반올림하면 사이의 오탐 1장이 들어와 90%
+    scores = np.array([0.45049 + 0.001 * i for i in range(9)] + [0.4502] + [0.1] * 10)
+    labels = np.array([1] * 9 + [0] + [0] * 10)
+    best = best_threshold(scores, labels)
+    assert np.isclose(best["threshold"], 0.45049) and best["precision"] == 1.0
+    assert metrics_at(scores, labels, round(best["threshold"], 3))["precision"] < MIN_PRECISION  # 반올림하면 깨진다
+    text = threshold_text(best["threshold"])
+    assert float(text) == best["threshold"]
+    assert metrics_at(scores, labels, float(text)) == best
+
+
 if __name__ == "__main__":
     test_smooth_and_false_run()
     test_best_threshold_between_grid()
+    test_threshold_text_keeps_precision()
     print("OK")

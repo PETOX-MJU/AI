@@ -105,6 +105,12 @@ def best_threshold(scores: np.ndarray, labels: np.ndarray) -> dict | None:
     return max(safe, key=lambda r: (r["recall"], r["threshold"])) if safe else None
 
 
+def threshold_text(threshold: float) -> str:
+    """앱·test 에 넘길 임계값 글자. 추천값은 관측 점수 그 자체라, 반올림하면 바로 아래 점수의 오탐이 들어와
+    정밀도 조건이 깨질 수 있다 (0.45049 → 0.450). repr 은 같은 float 로 정확히 되돌아온다."""
+    return repr(float(threshold))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=Path, default=BUILD / "shorts_classifier.tflite")
@@ -150,11 +156,11 @@ def main() -> None:
     best = best_threshold(scores, labels)
     print("\n" + "=" * 64)
     if best:
-        print(f"권장 임계값 {best['threshold']:.3f} (최근 {args.window}장 평균)")
+        print(f"권장 임계값 {threshold_text(best['threshold'])} (최근 {args.window}장 평균, 반올림하지 말고 그대로 쓴다)")
         print(header)
         print(row(best))
         print(f"앱에는 임계값과 창 크기({args.window})를 함께 넣으세요. 모델을 바꾸면 둘 다 다시 고릅니다.")
-        print(f"최종 판정: python eval.py --split test --threshold {best['threshold']:.3f} --window {args.window}")
+        print(f"최종 판정: python eval.py --split test --threshold {threshold_text(best['threshold'])} --window {args.window}")
         if best["recall"] < 0.80:
             print("\n[주의] 재현율이 80% 미만입니다. 숏폼을 자주 놓칩니다. 데이터를 더 모으세요.")
     else:
