@@ -39,3 +39,7 @@ checkpoints/
 pixelart/samples/*_pixel.png
 pixelart/samples/*_preview.png
 pixelart/samples/dog_32px_8c*.png
+
+# 템플릿 확인 시트·결과 (눈 검수용 생성물)
+pet_template/*_sheet.png
+pet_template/samples/*_character.png
