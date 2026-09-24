@@ -23,7 +23,7 @@
  ├ 화면 캡처 → shorts_classifier.tflite      숏폼 판별
  ├ 반려동물 사진 → ML Kit Image Labeling      유효성 판별 (Dog/Cat)
  │                → ML Kit Segmentation        배경 제거
- │                → 픽셀화                     색은 원본 사진에서 그대로
+ │                → 털색 추출 + 견종 템플릿 재색칠   견종은 사용자 선택, 색은 사진에서
  ├ 주간 분석·미션·한 줄 요약                   Kotlin (kotlin_port/)
  └ Room  ─ 사용 로그·코인·캐릭터 성장 (진실의 원천)
 
@@ -79,7 +79,7 @@ FE 앱은 이 코드를 그대로 복사해 쓴다(`FE android/app/src/main/java
 | `shorts_classifier/` | 숏폼 화면 판별 (MobileNetV3 → TFLite) | FE |
 | `kotlin_port/` | 주간 분석·미션·한 줄 요약 규칙 (Kotlin) | FE (복사) |
 | `pet_validation/` | 사진 유효성 판별 명세 (ML Kit, 학습 없음) | FE |
-| `pixelart/` | 반려동물 사진 → 픽셀 캐릭터 변환 | FE (Kotlin 이식) |
+| `pet_template/` | 반려동물 사진 → 견종 템플릿 재색칠 | FE (Kotlin 이식) |
 | `experiments/` | VLM 베이스라인 — **제품 경로 아님** | 비교용 |
 
 `experiments/` 의 모델은 성능 비교 기준선일 뿐이다. **배포 대상이 아니다.**
@@ -166,7 +166,7 @@ FE 는 릴리스에서 받아 `app/src/main/assets/` 에 넣는다.
 | 숏폼 분류기 정확도 | 데이터 수집 전 |
 | 중급기 추론 지연 | 미측정 |
 | 반려동물 유효성 판별 임계값 | 미조정 |
-| 픽셀화 파이프라인 | 미검증 |
+| 템플릿 재색칠 (실사진 털색 추출) | 미검증 |
 
 ### 에뮬레이터로는 검증이 안 된다
 

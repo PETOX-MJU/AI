@@ -21,6 +21,7 @@
 | TensorFlow / LiteRT | Apache 2.0 | ✅ | 2026-09-04 | |
 | 숏폼 판별 학습 데이터 | 자체 제작 | ✅ | — | 아래 「데이터 전략」 참고 |
 | ~~반려동물 분류 학습 데이터~~ | — | ✅ | — | **불필요** — ML Kit 이 유효성 판별을 담당 |
+| 견종 템플릿 에셋 | 팀 제작 (디자인) | ✅ | 2026-09-24 | `pet_template/assets/` — 드라이브 `peTox_픽셀` |
 
 ## 제품 경로 밖 (평가·비교 전용, 배포 금지)
 
@@ -28,7 +29,7 @@
 |---|---|---|
 | VARCO-VISION 2.0 | CC-BY-NC-4.0 (비상업) | `experiments/shorts_detection/` |
 | Qwen2.5-VL-7B-Instruct | Apache 2.0 | `experiments/pet_analysis_vlm/` |
-| rembg / U2-Net | MIT / Apache 2.0 | `pixelart/` 프로토타입 |
+| rembg / U2-Net | MIT / Apache 2.0 | `pet_template/` 파라미터 튜닝 |
 
 `experiments/` 의 모델은 **제품에 탑재하지 않는다.** 성능 비교 기준선일 뿐이다.
 
