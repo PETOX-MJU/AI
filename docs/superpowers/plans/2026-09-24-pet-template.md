@@ -4,7 +4,7 @@
 
 **Goal:** 반려동물 사진에서 털색을 뽑아, 사용자가 고른 견종 픽셀 템플릿을 그 색으로 재색칠하는 Kotlin 이식용 Python 기준 구현을 만들고 `pixelart/` 를 대체한다.
 
-**Architecture:** 단일 모듈 `pet_template/reference.py`. 에셋(SVG·GIF)을 RGBA 프레임으로 읽고, 견종별 역할표(`breeds.json`, hex → main/sub/keep)에 따라 Lab 공간에서 색 치환표 `{원본 hex: 새 hex}` 를 만든다. 사진 쪽은 배경 제거 → 3색 양자화 → 스와치 매칭으로 main·sub 스와치 이름을 낸다.
+**Architecture:** 단일 모듈 `pet_template/reference.py`. 에셋(SVG·GIF)을 RGBA 프레임으로 읽고, 견종별 역할표(`breeds.json`, hex → main/sub/keep)에 따라 Lab 공간에서 색 치환표 `{원본 hex: 새 hex}` 를 만든다. 사진 쪽은 배경 제거 → 불투명 픽셀마다 가장 가까운 스와치에 붙여 면적을 세서 main·sub 스와치 이름을 낸다.
 
 **Tech Stack:** Python 3.13, Pillow, NumPy (rembg 는 사진 CLI 에서만, 선택)
 
@@ -17,6 +17,8 @@
 - hex 는 항상 소문자 `#rrggbb`.
 - 역할은 `main`, `sub`, `keep` 세 가지뿐.
 - 튜닝 상수: `SUB_RATIO = 0.2`, `CHROMA_KEEP = 0.3`, `MIN_FUR_L = 15`.
+- 이식 대상 함수(`color_map`, `recolor_image`, `extract_colors`)는 Pillow 고유 알고리즘(양자화 등)에 기대지 않는다 — Kotlin 에서 같은 입력에 같은 결과가 나와야 한다.
+- 배경 제거 실패·사진 없음은 "색 추출 실패" 와 같다 → `color_map(breed, None, None) == {}` → 원본색.
 - 테스트는 저장소 관례대로 평범한 `test_*` 함수 + `__main__` 러너. 실행: `cd pet_template && python test_reference.py` (pytest 로도 돈다).
 - 주석·문서는 한국어, 기존 `pixelart/reference.py` 문체(단계가 드러나게, 이유를 적는 주석)를 따른다.
 - 사진 분석 실패가 가입 흐름을 막으면 안 된다 — 실패는 "원본색 그대로" 로 귀결.
@@ -289,7 +291,7 @@ def test_recolor_image_swaps_exact_pixels_only():
 
 def test_load_breeds_rejects_bad_role():
     bad = {
-        "swatches": {"black": "#2b2627"},
+        "swatches": {"black": "#453d3e"},
         "breeds": {"shiba": {"assets": {"front": "shiba/front.svg"}, "roles": {"#ca895a": "outline"}}},
     }
     with tempfile.TemporaryDirectory() as d:
@@ -451,7 +453,7 @@ def draft_breeds() -> dict:
 
 # 사용자가 고를 털색. 사진 색은 여기 중 가장 가까운 것에 붙는다. 실사진으로 조정할 튜닝값.
 SWATCHES = {
-    "black": "#2b2627",
+    "black": "#453d3e",  # L≈27. 더 어두우면 음영을 담을 밝기 여유가 없다
     "brown": "#6e4a32",
     "red": "#c47a45",
     "golden": "#e0a860",
@@ -553,9 +555,15 @@ def test_color_map_moves_base_exactly_and_keeps_shading():
     assert all(a <= b + 0.5 for a, b in zip(after, after[1:])), "명암 순서가 뒤집혔다"
 
 
-def test_black_fur_stays_above_outline():
-    shiba, _, _ = _shiba_mains()
-    assert all(hex_to_lab(v)[0] >= MIN_FUR_L - 0.5 for v in color_map(shiba, "#000000", None).values())
+def test_extreme_targets_keep_every_shade():
+    """검정·흰색은 밝기 여유가 없다. 음영 단계가 하나로 뭉개지거나 외곽선과 붙으면 안 된다."""
+    for name, breed in load_breeds()["breeds"].items():
+        mains = [h for h, r in breed["roles"].items() if r == "main"]
+        for target in ("#453d3e", "#f4f2ee", "#000000"):
+            cmap = color_map(breed, target, None)
+            if target != "#000000":  # 순검정은 여유가 0 이라 뭉개지는 게 정상 — 하한만 본다
+                assert len(set(cmap.values())) == len(mains), f"{name} {target}: 음영이 합쳐졌다"
+            assert min(hex_to_lab(v)[0] for v in cmap.values()) >= MIN_FUR_L - 0.5, f"{name} {target}"
 
 
 def test_no_target_keeps_original():
@@ -589,7 +597,8 @@ def color_map(breed: dict, main: str | None, sub: str | None) -> dict:
     """역할표 + 목표색(hex) → {원본 hex: 새 hex}.
 
     역할의 기준색(픽셀 수 최다)이 목표색이 되도록 역할 전체를 Lab 에서 옮긴다.
-    밝기 차(명암)는 그대로 두고 색조 차는 CHROMA_KEEP 배로 줄인다.
+    색조 차는 CHROMA_KEEP 배로 줄이고, 밝기 차(명암)는 유지하되 [MIN_FUR_L, 100] 에
+    들어가도록 어두운 쪽·밝은 쪽을 각각 비율로 줄인다. 잘라내면(클램프) 음영이 한 색으로 뭉개진다.
     목표가 None 인 역할은 원본을 유지한다 — 사진 분석이 실패해도 캐릭터는 나온다.
     """
     counts = breed_colors(breed)
@@ -600,10 +609,14 @@ def color_map(breed: dict, main: str | None, sub: str | None) -> dict:
             continue
         base = hex_to_lab(max(colors, key=lambda h: counts[h]))
         goal = hex_to_lab(target)
-        for h in colors:
-            lab = goal + (hex_to_lab(h) - base) * np.array([1, CHROMA_KEEP, CHROMA_KEEP])
-            lab[0] = np.clip(lab[0], MIN_FUR_L, 100)
-            out[h] = lab_to_hex(lab)
+        deltas = {h: hex_to_lab(h) - base for h in colors}
+        darkest = min(d[0] for d in deltas.values())  # ≤ 0 (기준색 자신이 0)
+        brightest = max(d[0] for d in deltas.values())  # ≥ 0
+        squeeze_dark = min(1.0, max(0.0, goal[0] - MIN_FUR_L) / -darkest) if darkest < 0 else 1.0
+        squeeze_bright = min(1.0, max(0.0, 100 - goal[0]) / brightest) if brightest > 0 else 1.0
+        for h, d in deltas.items():
+            dl = d[0] * (squeeze_dark if d[0] < 0 else squeeze_bright)
+            out[h] = lab_to_hex(goal + np.array([dl, d[1] * CHROMA_KEEP, d[2] * CHROMA_KEEP]))
     return out
 
 
@@ -647,7 +660,7 @@ Expected: `OK`
 Run: `cd pet_template && python reference.py --sheet`
 `swatch_sheet.png` 를 열어 확인하고 사용자에게 보낸다. 특히 볼 곳:
 - 검은 닥스 → white·cream: 명암이 뭉개지거나 얼룩지지 않는가
-- black: 털이 외곽선과 구분되는가
+- black: 털이 외곽선과 구분되고, 음영 단계가 눈에 보이는가 (압축 후 L 15~35 사이에 몰린다)
 어색하면 `CHROMA_KEEP`, `MIN_FUR_L`, 스와치 값을 조정하고 결과를 커밋 메시지에 적는다.
 
 - [ ] **Step 6: 커밋**
@@ -667,7 +680,7 @@ git commit -m "feat(pet_template): 역할 기반 Lab 재색칠과 스와치 확�
 
 **Interfaces:**
 - Consumes: `hex_to_rgb8`, `hex_to_lab`, `rgb_to_lab`, `load_breeds`, `color_map`, `recolor_image`, `asset_frames`
-- Produces: `SUB_RATIO = 0.2`, `extract_colors(img, swatches: dict[name, hex]) -> tuple[name | None, name | None]` (**스와치 이름**을 돌려준다 — 앱 UI 가 스와치를 선택 상태로 보여줘야 해서), `load_upright(path)`, `remove_background(img)`, CLI `photo --breed NAME [--out PATH]`
+- Produces: `SUB_RATIO = 0.2`, `extract_colors(img | None, swatches: dict[name, hex]) -> tuple[name | None, name | None]` (**스와치 이름**을 돌려준다 — 앱 UI 가 스와치를 선택 상태로 보여줘야 해서. `img` 가 None 이면 (None, None)), `load_upright(path)`, `remove_background(img) -> Image | None` (배경 제거를 못 하면 None), CLI `photo --breed NAME [--out PATH]`
 
 - [ ] **Step 1: 실패하는 테스트 추가**
 
@@ -702,6 +715,17 @@ def test_small_second_color_is_dropped():
 def test_nothing_opaque_means_no_colors():
     sw = load_breeds()["swatches"]
     assert extract_colors(Image.new("RGBA", (10, 10), (0, 0, 0, 0)), sw) == (None, None)
+
+
+def test_no_mask_means_no_colors():
+    """배경 제거에 실패하면 배경 섞인 색을 뽑지 말고 원본색으로 간다."""
+    assert extract_colors(None, load_breeds()["swatches"]) == (None, None)
+
+
+def test_near_colors_snap_to_swatch():
+    """조명에 조금 틀어진 색도 가장 가까운 스와치로 붙는다. FE 이식 결과를 맞출 기준 사례."""
+    sw = load_breeds()["swatches"]
+    assert extract_colors(_photo([("#6a4830", 60), ("#f0eee8", 40)]), sw) == ("brown", "white")
 ```
 
 - [ ] **Step 2: 실패 확인**
@@ -725,23 +749,30 @@ def load_upright(path: Path) -> Image.Image:
     return ImageOps.exif_transpose(Image.open(path)).convert("RGBA")
 
 
-def remove_background(image: Image.Image) -> Image.Image:
-    """배경을 지우고 RGBA 로 돌려준다. 앱에서는 ML Kit 이 담당한다."""
+def remove_background(image: Image.Image) -> Image.Image | None:
+    """배경을 지우고 RGBA 로 돌려준다. 앱에서는 ML Kit 이 담당한다.
+
+    못 지우면 None. 배경 섞인 사진으로 색을 뽑으면 벽지 색 강아지가 나온다 — 원본색이 낫다.
+    """
     try:
         from rembg import remove
     except ImportError:
-        print("[알림] rembg 미설치 — 배경 제거를 건너뜁니다 (pip install rembg)")
-        return image.convert("RGBA")
+        print("[알림] rembg 미설치 — 배경 제거 불가, 원본색으로 진행합니다 (pip install rembg)")
+        return None
     return remove(image).convert("RGBA")
 
 
-def extract_colors(img: Image.Image, swatches: dict) -> tuple:
+def extract_colors(img: Image.Image | None, swatches: dict) -> tuple:
     """배경을 지운 RGBA → (main 스와치 이름, sub 스와치 이름 또는 None).
 
-    불투명 픽셀이 없으면 (None, None) — 호출 측은 템플릿 원본색으로 간다.
+    img 가 None(배경 제거 실패)이거나 불투명 픽셀이 없으면 (None, None) — 호출 측은 원본색으로 간다.
+    불투명 픽셀 하나하나를 Lab 에서 가장 가까운 스와치에 붙이고 면적을 센다.
+    양자화를 거치지 않는 건 Kotlin 에서 같은 결과를 내기 위해서다 (Pillow MEDIANCUT 은 재현이 어렵다).
     사진 색을 그대로 쓰지 않고 스와치에 붙이는 건, 조명에 탁해진 색을 피하고
     사용자가 바꿀 선택지를 주기 위해서다.
     """
+    if img is None:
+        return None, None
     img = img.convert("RGBA")
     img.thumbnail((256, 256))  # 폰 사진 원본은 너무 크다. 색 비율에는 영향이 없다
     arr = np.array(img)
@@ -749,16 +780,11 @@ def extract_colors(img: Image.Image, swatches: dict) -> tuple:
     if len(fur) == 0:
         return None, None
 
-    strip = Image.fromarray(fur[None].astype(np.uint8))
-    quant = strip.quantize(colors=3, method=Image.Quantize.MEDIANCUT)
-    palette = quant.getpalette()
     names = list(swatches)
     swatch_labs = np.array([hex_to_lab(swatches[n]) for n in names])
-
-    area = Counter()
-    for count, idx in quant.getcolors():
-        lab = rgb_to_lab(np.array(palette[idx * 3 : idx * 3 + 3]) / 255)
-        area[names[int(np.argmin(np.linalg.norm(swatch_labs - lab, axis=1)))]] += count
+    labs = rgb_to_lab(fur / 255)
+    nearest = np.argmin(np.linalg.norm(labs[:, None, :] - swatch_labs[None, :, :], axis=2), axis=1)
+    area = Counter({names[i]: int(n) for i, n in zip(*np.unique(nearest, return_counts=True))})
 
     (main, _), *rest = area.most_common()
     sub = rest[0][0] if rest and rest[0][1] / len(fur) >= SUB_RATIO else None
@@ -782,11 +808,7 @@ def extract_colors(img: Image.Image, swatches: dict) -> tuple:
             parser.error(f"--breed 는 {', '.join(data['breeds'])} 중 하나")
         breed = data["breeds"][args.breed]
         main_name, sub_name = extract_colors(remove_background(load_upright(args.photo)), data["swatches"])
-        cmap = color_map(
-            breed,
-            data["swatches"].get(main_name),
-            data["swatches"].get(sub_name),
-        )
+        cmap = color_map(breed, data["swatches"].get(main_name), data["swatches"].get(sub_name))
         (front,) = asset_frames(ASSETS / breed["assets"]["front"])
         sprite = recolor_image(front, cmap)
         out = args.out or args.photo.with_name(f"{args.photo.stem}_character.png")
@@ -796,14 +818,14 @@ def extract_colors(img: Image.Image, swatches: dict) -> tuple:
         return
 ```
 
-(`data["swatches"].get(None)` 은 None 이라 추출 실패 시 원본색이 된다.)
+(`data["swatches"].get(None)` 은 None 이라 배경 제거·추출 실패 시 원본색이 된다.)
 
 - [ ] **Step 4: 통과 확인**
 
 Run: `cd pet_template && python test_reference.py`
 Expected: `OK`
 
-- [ ] **Step 5: 실사진 확인**
+- [ ] **Step 5: 샘플 동작 확인 (실사진 검증 아님)**
 
 `pixelart/samples/testdog.png` 를 옮긴다:
 
@@ -812,7 +834,7 @@ mkdir -p pet_template/samples && git mv pixelart/samples/testdog.png pet_templat
 ```
 
 Run: `cd pet_template && python reference.py samples/testdog.png --breed golden`
-Expected: `털색 main=... sub=...` 와 `samples/testdog_character.png`. 결과 이미지를 열어 사진 털색과 맞는지 보고 사용자에게 보낸다. rembg 가 없으면 배경이 섞여 결과가 틀릴 수 있다 — 출력의 `[알림]` 을 결과 보고에 적는다.
+Expected: `털색 main=... sub=...` 와 `samples/testdog_character.png`. `testdog.png` 는 **합성 도형**이다 — CLI 경로가 끝까지 도는지만 확인한다. rembg 가 없으면 `[알림]` 과 함께 `main=None sub=None`, 원본색 캐릭터가 나와야 한다. 결과를 사용자에게 보내고, 실사진 털색 추출은 README 검증 상태에 **미검증**으로 남긴다.
 
 - [ ] **Step 6: 커밋**
 
@@ -864,13 +886,16 @@ rembg
 
 ```
 사진 → 배경 제거 (앱: ML Kit Subject Segmentation / 여기: rembg)
-     → 3색 양자화 → 스와치 매칭          main·sub 털색 (스와치 이름)
+     → 픽셀마다 가까운 스와치로 → 면적 순   main·sub 털색 (스와치 이름)
 견종(사용자 선택) + main·sub → 색 치환표 {원본 hex: 새 hex}
      → 에셋 프레임 픽셀 치환              캐릭터
 ```
 
 **생성형 모델은 쓰지 않는다.** 전부 결정론적 연산이라 온디바이스에서 즉시 돌고 같은 입력에 같은 결과가 나온다.
 견종 분류기도 없다. 견종은 사용자가 고르므로 오답이 없다.
+
+**사진이 없거나 배경 제거·털색 추출이 실패하면** `color_map(breed, None, None)` 이 빈 표를 돌려주고
+견종 템플릿 원본색이 그대로 나온다. 가입 흐름을 막지 않는다.
 
 ## 에셋과 역할표
 
@@ -905,16 +930,16 @@ python test_reference.py
 | `SWATCHES` | 사용자가 고르는 털색. 사진 색은 가장 가까운 스와치로 붙는다 |
 | `SUB_RATIO` (0.2) | 두 번째 색이 이 비율 이상이면 sub. 낮추면 눈·혀가 sub 로 잡힌다 |
 | `CHROMA_KEEP` (0.3) | 명암 단계의 색조 편차를 얼마나 남길지. 높이면 원본 느낌, 낮추면 단색에 가깝다 |
-| `MIN_FUR_L` (15) | 털 밝기 하한. 검은 털이 외곽선과 붙지 않게 한다 |
+| `MIN_FUR_L` (15) | 털 밝기 하한. 검은 털이 외곽선과 붙지 않게 한다. 음영은 잘라내지 않고 비율로 압축한다 |
 
 ## 검증 상태
 
 | 항목 | 상태 |
 |---|---|
 | 역할표 커버리지 (5견종 전 에셋) | ✅ 테스트 |
-| 재색칠 명암 순서·밝기 하한 | ✅ 테스트 |
+| 재색칠 명암 순서·음영 단계 유지·밝기 하한 | ✅ 테스트 |
 | 스와치 시트 눈 검수 | 커밋 시점 기록 참고 |
-| **실제 반려동물 사진 털색 추출** | ❌ **미검증** — 합성 이미지로만 확인 |
+| **실제 반려동물 사진 털색 추출** | ❌ **미검증** — 합성 이미지로만 확인 (`samples/testdog.png` 도 합성 도형) |
 | ML Kit 마스크와의 차이 | ❌ 미검증 |
 
 ### 알려진 한계
@@ -925,7 +950,8 @@ python test_reference.py
 
 ## 이식 시 주의
 
-- 앱에서 옮길 것은 `color_map`(Lab 변환 포함)과 `recolor_image`(픽셀 치환) 둘이다. SVG 를 직접 그린다면 `recolor_svg`
+- 앱에서 옮길 것은 `extract_colors`(털색), `color_map`(Lab 변환 포함), `recolor_image`(픽셀 치환) 셋이다. SVG 를 직접 그린다면 `recolor_svg`
+- `extract_colors` 는 양자화 없이 픽셀별 최근접 스와치라 Kotlin 에서도 같은 값이 나온다. `test_reference.py` 의 합성 사례(`test_extract_*`, `test_near_colors_snap_to_swatch`)를 FE 테스트로 그대로 옮겨 결과를 맞춰라
 - 역할표·스와치는 `breeds.json` 을 그대로 앱 에셋으로 넣는다. 코드에 옮겨 적지 마라
 - 치환표는 견종·색 조합당 한 번 계산해 캐시하면 된다. 프레임마다 다시 만들 필요가 없다
 - rembg(U2-Net)와 ML Kit 마스크는 다르다. 최종 확인은 실기기에서 하라
