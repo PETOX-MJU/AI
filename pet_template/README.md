@@ -54,7 +54,7 @@ python test_reference.py
 
 | 상수 | 영향 |
 |---|---|
-| `SWATCHES` | 사용자가 고르는 털색. 사진 색은 가장 가까운 스와치로 붙는다 |
+| `breeds.json` 의 `swatches` | 사용자가 고르는 털색. 사진 색은 가장 가까운 스와치로 붙는다. 코드 상수가 아니라 데이터로만 관리한다(런타임은 전부 이 파일을 읽는다) |
 | `SUB_RATIO` (0.2) | 두 번째 색이 이 비율 이상이면 sub. 낮추면 눈·혀가 sub 로 잡힌다 |
 | `CHROMA_KEEP` (0.3) | 명암 단계의 색조 편차를 얼마나 남길지. 높이면 원본 느낌, 낮추면 단색에 가깝다. 목표색 채도가 낮을수록(무채색에 가까울수록) 비례해서 덜 적용된다 |
 | `MIN_FUR_L` (15) | 털 밝기 하한. 목표색 L 도 이 값 이상으로 올려서(순검정도 L 15 로) 검은 털이 외곽선과 붙지 않게 한다. 음영은 잘라내지 않고 비율로 압축한다 |
@@ -65,7 +65,7 @@ python test_reference.py
 |---|---|
 | 역할표 커버리지 (5견종 전 에셋) | ✅ 테스트 |
 | 재색칠 명암 순서·음영 단계 유지·밝기 하한 | ✅ 테스트 |
-| 스와치 시트 눈 검수 | 커밋 시점 기록 참고 |
+| 스와치 시트 눈 검수 | ✅ 2026-09-24, 5견종 × 7스와치 전수 확인 — golden 무채색 목표의 파란 색조 침범 발견 후 수정(커밋 679c34c) |
 | **실제 반려동물 사진 털색 추출** | ❌ **미검증** — 합성 이미지로만 확인 (`samples/testdog.png` 도 합성 도형) |
 | ML Kit 마스크와의 차이 | ❌ 미검증 |
 
@@ -77,8 +77,11 @@ python test_reference.py
 
 ## 이식 시 주의
 
-- 앱에서 옮길 것은 `extract_colors`(털색), `color_map`(Lab 변환 포함), `recolor_image`(픽셀 치환) 셋이다. SVG 를 직접 그린다면 `recolor_svg`
-- `extract_colors` 는 양자화 없이 픽셀별 최근접 스와치라 Kotlin 에서도 같은 값이 나온다. `test_reference.py` 의 합성 사례(`test_extract_*`, `test_near_colors_snap_to_swatch`)를 FE 테스트로 그대로 옮겨 결과를 맞춰라
+- 앱에서 옮길 것은 `extract_colors`(털색), `fit_to_template`(사진 main·sub 순서 보정, 사진 경로 전용), `color_map`(Lab 변환 포함), `recolor_image`(픽셀 치환) 넷이다. SVG 를 직접 그린다면 `recolor_svg`
+- `extract_colors` 는 양자화 없이 픽셀별 최근접 스와치이고, 축소도 리샘플링 없는 stride 서브샘플링이라 Kotlin 에서도 같은 값이 나온다. `test_reference.py` 의 합성 사례(`test_extract_*`, `test_near_colors_snap_to_swatch`)를 FE 테스트로 그대로 옮겨 결과를 맞춰라
 - 역할표·스와치는 `breeds.json` 을 그대로 앱 에셋으로 넣는다. 코드에 옮겨 적지 마라
 - 치환표는 견종·색 조합당 한 번 계산해 캐시하면 된다. 프레임마다 다시 만들 필요가 없다
 - rembg(U2-Net)와 ML Kit 마스크는 다르다. 최종 확인은 실기기에서 하라
+- `extract_colors` 에서 스와치 면적이 동률이면 `dict`(= `breeds.json` 의 `swatches` 선언 순서) 순회로 먼저 나온 쪽이 이긴다. Kotlin 도 같은 순서로 스와치를 순회해야 동률일 때 결과가 갈리지 않는다
+- 역할의 기준색(픽셀 수 최다)은 `breed_colors` 로 **에셋 전체 파일의 모든 프레임**을 센 결과다. golden main 은 1위(`#efb768` 4443px)와 2위(3803px) 차이가 크지 않다 — 이식 쪽이 프레임 일부만 세거나 다른 자료로 세면 기준색이 바뀐다. 같은 방식으로 세거나, 계산해 둔 기준색을 하드코딩하라
+- `fit_to_template` 은 사진에서 뽑은 색을 쓸 때만 쓴다. 사용자가 스와치를 직접 고른 값은 그대로 `color_map` 에 넣어라 — 순서를 뒤집으면 사용자 선택을 무시하는 셈이다
