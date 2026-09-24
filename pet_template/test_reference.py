@@ -98,13 +98,14 @@ def test_extreme_targets_keep_every_shade():
             cmap = color_map(breed, target, None)
             lost = len(mains) - len(set(cmap.values()))
             if target != "#000000":  # 순검정은 여유가 0 이라 뭉개지는 게 정상 — 하한만 본다
-                # golden 처럼 음영이 촘촘한(29 단계) 견종은 흰색 근처(여유 L≈3)에서 8비트
-                # sRGB 반올림으로 극소수가 겹칠 수 있다 — 알고리즘 버그가 아니라 색 공간
-                # 해상도의 한계다(CHROMA_KEEP 을 0.3→1.0 으로 올려도 28/29 까지만 개선돼
-                # 근본적으로 못 없앤다, 실측 확인). 무채색 목표(예: 검정)에서는 색조 편차로
-                # 구분되던, L 이 거의 같은 쌍이 chroma_keep 축소로 함께 겹치기도 한다
-                # (골든 검정: 3 쌍). 완전 동일 개수를 요구하진 않는다.
-                assert lost <= 3, f"{name} {target}: 음영이 {lost}개 합쳐졌다"
+                # 8비트 sRGB 반올림/무채색 chroma_keep 축소로 인한 겹침은 음영 단계가
+                # 촘촘할수록(=main 색이 많을수록) 늘어난다 — 알고리즘 버그가 아니라 색
+                # 공간 해상도의 한계다. 그래서 견종별 main 개수에 비례한 허용치를 쓴다
+                # (실측: corgi 10→#453d3e 1개, golden 29→#453d3e 3개/#f4f2ee 2개,
+                # dachshund·husky·shiba 는 0개). len(mains)//8 은 이 실측치를 모두
+                # 통과시키면서 dachshund·husky·shiba 의 허용치는 최대 1 로 작게 유지한다.
+                allowed = len(mains) // 8
+                assert lost <= allowed, f"{name} {target}: 음영이 {lost}개 합쳐졌다 (허용 {allowed})"
             assert min(hex_to_lab(v)[0] for v in cmap.values()) >= MIN_FUR_L - 0.5, f"{name} {target}"
 
 
