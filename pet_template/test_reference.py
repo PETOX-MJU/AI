@@ -13,8 +13,10 @@ from reference import (
     asset_frames,
     breed_colors,
     color_map,
+    extract_colors,
     frame_colors,
     hex_to_lab,
+    hex_to_rgb8,
     lab_to_hex,
     load_breeds,
     recolor_image,
@@ -161,6 +163,47 @@ def test_breeds_json_covers_every_asset_color():
         colors, roles = set(breed_colors(breed)), set(breed["roles"])
         assert not colors - roles, f"{name}: 역할표에 없는 색 {sorted(colors - roles)}"
         assert not roles - colors, f"{name}: 에셋에 없는 색 {sorted(roles - colors)}"
+
+
+def _photo(parts):
+    """[(hex, 칸 수)] 를 가로로 잇고 오른쪽 끝 10칸은 투명으로 둔다 — 배경 제거 결과 흉내."""
+    img = Image.new("RGBA", (sum(n for _, n in parts) + 10, 10), (0, 0, 0, 0))
+    x = 0
+    for h, n in parts:
+        img.paste(Image.new("RGBA", (n, 10), hex_to_rgb8(h) + (255,)), (x, 0))
+        x += n
+    return img
+
+
+def test_extract_single_color():
+    sw = load_breeds()["swatches"]
+    assert extract_colors(_photo([(sw["brown"], 100)]), sw) == ("brown", None)
+
+
+def test_extract_two_tone():
+    sw = load_breeds()["swatches"]
+    assert extract_colors(_photo([(sw["white"], 70), (sw["brown"], 30)]), sw) == ("white", "brown")
+
+
+def test_small_second_color_is_dropped():
+    sw = load_breeds()["swatches"]
+    assert extract_colors(_photo([(sw["white"], 90), (sw["brown"], 10)]), sw) == ("white", None)
+
+
+def test_nothing_opaque_means_no_colors():
+    sw = load_breeds()["swatches"]
+    assert extract_colors(Image.new("RGBA", (10, 10), (0, 0, 0, 0)), sw) == (None, None)
+
+
+def test_no_mask_means_no_colors():
+    """배경 제거에 실패하면 배경 섞인 색을 뽑지 말고 원본색으로 간다."""
+    assert extract_colors(None, load_breeds()["swatches"]) == (None, None)
+
+
+def test_near_colors_snap_to_swatch():
+    """조명에 조금 틀어진 색도 가장 가까운 스와치로 붙는다. FE 이식 결과를 맞출 기준 사례."""
+    sw = load_breeds()["swatches"]
+    assert extract_colors(_photo([("#6a4830", 60), ("#f0eee8", 40)]), sw) == ("brown", "white")
 
 
 if __name__ == "__main__":

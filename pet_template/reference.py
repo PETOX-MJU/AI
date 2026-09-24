@@ -17,7 +17,7 @@ from collections import Counter
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 HERE = Path(__file__).parent
 ASSETS = HERE / "assets"
@@ -172,6 +172,57 @@ def suggest_roles(counts: Counter) -> dict:
     return dict(sorted(roles.items(), key=lambda kv: (ROLES.index(kv[1]), kv[0])))
 
 
+# ── 사진 → 털색 ────────────────────────────────────────
+SUB_RATIO = 0.2  # 두 번째 색이 이 비율 이상이어야 sub 로 인정. 눈·코·혀가 sub 가 되지 않게 한다
+
+
+def load_upright(path: Path) -> Image.Image:
+    """폰 사진은 EXIF 회전 정보를 갖는다. 적용하지 않으면 마스크가 어긋난다."""
+    return ImageOps.exif_transpose(Image.open(path)).convert("RGBA")
+
+
+def remove_background(image: Image.Image) -> Image.Image | None:
+    """배경을 지우고 RGBA 로 돌려준다. 앱에서는 ML Kit 이 담당한다.
+
+    못 지우면 None. 배경 섞인 사진으로 색을 뽑으면 벽지 색 강아지가 나온다 — 원본색이 낫다.
+    """
+    try:
+        from rembg import remove
+    except ImportError:
+        print("[알림] rembg 미설치 — 배경 제거 불가, 원본색으로 진행합니다 (pip install rembg)")
+        return None
+    return remove(image).convert("RGBA")
+
+
+def extract_colors(img: Image.Image | None, swatches: dict) -> tuple:
+    """배경을 지운 RGBA → (main 스와치 이름, sub 스와치 이름 또는 None).
+
+    img 가 None(배경 제거 실패)이거나 불투명 픽셀이 없으면 (None, None) — 호출 측은 원본색으로 간다.
+    불투명 픽셀 하나하나를 Lab 에서 가장 가까운 스와치에 붙이고 면적을 센다.
+    양자화를 거치지 않는 건 Kotlin 에서 같은 결과를 내기 위해서다 (Pillow MEDIANCUT 은 재현이 어렵다).
+    사진 색을 그대로 쓰지 않고 스와치에 붙이는 건, 조명에 탁해진 색을 피하고
+    사용자가 바꿀 선택지를 주기 위해서다.
+    """
+    if img is None:
+        return None, None
+    img = img.convert("RGBA")
+    img.thumbnail((256, 256))  # 폰 사진 원본은 너무 크다. 색 비율에는 영향이 없다
+    arr = np.array(img)
+    fur = arr[arr[..., 3] > 128][:, :3]
+    if len(fur) == 0:
+        return None, None
+
+    names = list(swatches)
+    swatch_labs = np.array([hex_to_lab(swatches[n]) for n in names])
+    labs = rgb_to_lab(fur / 255)
+    nearest = np.argmin(np.linalg.norm(labs[:, None, :] - swatch_labs[None, :, :], axis=2), axis=1)
+    area = Counter({names[i]: int(n) for i, n in zip(*np.unique(nearest, return_counts=True))})
+
+    (main, _), *rest = area.most_common()
+    sub = rest[0][0] if rest and rest[0][1] / len(fur) >= SUB_RATIO else None
+    return main, sub
+
+
 # ── 재색칠 ─────────────────────────────────────────────
 CHROMA_KEEP = 0.3  # 색조 차를 얼마나 남길지. 1 이면 원본 색조 편차 그대로, 0 이면 단색
 MIN_FUR_L = 15  # 털 밝기 하한. 외곽선(L≈3~8)과 붙지 않게 한다
@@ -290,12 +341,29 @@ SWATCHES = {
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument("photo", type=Path, nargs="?", help="반려동물 사진")
+    parser.add_argument("--breed", help="견종 (breeds.json 의 키)")
+    parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--suggest-roles", action="store_true", help="breeds.json 초안을 출력한다")
     parser.add_argument("--roles-sheet", action="store_true", help="역할표 검수 시트를 만든다")
     parser.add_argument("--sheet", action="store_true", help="견종 × 스와치 확인 시트를 만든다")
     args = parser.parse_args()
 
-    if args.suggest_roles:
+    if args.photo:
+        data = load_breeds()
+        if args.breed not in data["breeds"]:
+            parser.error(f"--breed 는 {', '.join(data['breeds'])} 중 하나")
+        breed = data["breeds"][args.breed]
+        main_name, sub_name = extract_colors(remove_background(load_upright(args.photo)), data["swatches"])
+        cmap = color_map(breed, data["swatches"].get(main_name), data["swatches"].get(sub_name))
+        (front,) = asset_frames(ASSETS / breed["assets"]["front"])
+        sprite = recolor_image(front, cmap)
+        out = args.out or args.photo.with_name(f"{args.photo.stem}_character.png")
+        sprite.resize((sprite.width * 8, sprite.height * 8), Image.NEAREST).save(out)
+        print(f"털색 main={main_name} sub={sub_name}")
+        print(f"캐릭터 {out}")
+        return
+    elif args.suggest_roles:
         print(json.dumps(draft_breeds(), ensure_ascii=False, indent=2))
     elif args.roles_sheet:
         out = HERE / "roles_sheet.png"
