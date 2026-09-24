@@ -1,6 +1,10 @@
 """python test_reference.py — 재색칠 기준 구현 검사."""
 
+import contextlib
+import io
 import json
+import subprocess
+import sys
 import tempfile
 from collections import Counter
 from pathlib import Path
@@ -20,6 +24,7 @@ from reference import (
     hex_to_rgb8,
     lab_to_hex,
     load_breeds,
+    make_character,
     recolor_image,
     recolor_svg,
     render_svg,
@@ -259,6 +264,45 @@ def test_fit_to_template_swaps_to_template_order():
     assert fit_to_template(golden, sw["black"], sw["white"]) == (sw["black"], sw["white"])
     # sub 가 None(추출 실패)이면 그대로 둔다
     assert fit_to_template(husky, sw["gray"], None) == (sw["gray"], None)
+
+
+def _shiba_front():
+    (front,) = asset_frames(ASSETS / "shiba" / "front.svg")
+    return front
+
+
+def test_character_without_photo_is_original():
+    """사진 없이 견종만 골라도 원본색 캐릭터가 나온다 — 가입 흐름을 막지 않는다."""
+    data = load_breeds()
+    sprite, main, sub = make_character(data["breeds"]["shiba"], None, data["swatches"])
+    assert (main, sub) == (None, None)
+    assert sprite.tobytes() == _shiba_front().tobytes()
+
+
+def test_character_from_missing_or_broken_photo_is_original():
+    data = load_breeds()
+    with tempfile.TemporaryDirectory() as d:
+        broken = Path(d) / "broken.jpg"
+        broken.write_bytes(b"not an image")
+        for photo in (Path(d) / "missing.jpg", broken):
+            with contextlib.redirect_stdout(io.StringIO()):  # 예상된 [알림] 출력은 숨긴다
+                sprite, main, sub = make_character(data["breeds"]["shiba"], photo, data["swatches"])
+            assert (main, sub) == (None, None), photo.name
+            assert sprite.tobytes() == _shiba_front().tobytes(), photo.name
+
+
+def test_cli_missing_photo_exits_cleanly():
+    """리뷰 재현 사례: `reference.py missing.jpg --breed shiba` 가 예외로 죽지 않는다."""
+    with tempfile.TemporaryDirectory() as d:
+        out = Path(d) / "character.png"
+        run = subprocess.run(
+            [sys.executable, "reference.py", str(Path(d) / "missing.jpg"), "--breed", "shiba", "--out", str(out)],
+            cwd=Path(__file__).parent,
+            capture_output=True,
+            text=True,
+        )
+        assert run.returncode == 0, run.stderr
+        assert out.is_file()
 
 
 if __name__ == "__main__":

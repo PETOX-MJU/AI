@@ -176,16 +176,26 @@ def suggest_roles(counts: Counter) -> dict:
 SUB_RATIO = 0.2  # 두 번째 색이 이 비율 이상이어야 sub 로 인정. 눈·코·혀가 sub 가 되지 않게 한다
 
 
-def load_upright(path: Path) -> Image.Image:
-    """폰 사진은 EXIF 회전 정보를 갖는다. 적용하지 않으면 마스크가 어긋난다."""
-    return ImageOps.exif_transpose(Image.open(path)).convert("RGBA")
+def load_upright(path: Path) -> Image.Image | None:
+    """폰 사진은 EXIF 회전 정보를 갖는다. 적용하지 않으면 마스크가 어긋난다.
+
+    파일이 없거나 이미지가 아니면 None — 원본색으로 진행한다. 가입 흐름을 막지 않는다.
+    """
+    try:
+        return ImageOps.exif_transpose(Image.open(path)).convert("RGBA")
+    except OSError as e:  # FileNotFoundError, 손상 파일(UnidentifiedImageError) 모두 OSError
+        print(f"[알림] 사진을 읽지 못함({e}) — 원본색으로 진행합니다")
+        return None
 
 
-def remove_background(image: Image.Image) -> Image.Image | None:
+def remove_background(image: Image.Image | None) -> Image.Image | None:
     """배경을 지우고 RGBA 로 돌려준다. 앱에서는 ML Kit 이 담당한다.
 
     못 지우면 None. 배경 섞인 사진으로 색을 뽑으면 벽지 색 강아지가 나온다 — 원본색이 낫다.
+    사진을 못 읽었으면(None) 그대로 None.
     """
+    if image is None:
+        return None
     try:
         from rembg import remove
     except ImportError:
@@ -364,31 +374,39 @@ def draft_breeds() -> dict:
     return {"swatches": swatches, "breeds": breeds}
 
 
+def make_character(breed: dict, photo: Path | None, swatches: dict) -> tuple:
+    """사진(없어도 됨) → (앞모습 캐릭터, main 스와치 이름, sub 스와치 이름).
+
+    사진이 없거나 읽기·배경 제거·추출 중 하나라도 실패하면 이름은 (None, None) 이고
+    견종 템플릿 원본색이 나온다.
+    """
+    main_name, sub_name = (None, None)
+    if photo is not None:
+        main_name, sub_name = extract_colors(remove_background(load_upright(photo)), swatches)
+    main_hex, sub_hex = fit_to_template(breed, swatches.get(main_name), swatches.get(sub_name))
+    hex_to_name = {v: k for k, v in swatches.items()}
+    (front,) = asset_frames(ASSETS / breed["assets"]["front"])
+    sprite = recolor_image(front, color_map(breed, main_hex, sub_hex))
+    return sprite, hex_to_name.get(main_hex), hex_to_name.get(sub_hex)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("photo", type=Path, nargs="?", help="반려동물 사진")
-    parser.add_argument("--breed", help="견종 (breeds.json 의 키)")
+    parser.add_argument("photo", type=Path, nargs="?", help="반려동물 사진 (없으면 원본색)")
+    parser.add_argument("--breed", help="견종 (breeds.json 의 키). 사진 없이 주면 원본색 캐릭터")
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--suggest-roles", action="store_true", help="breeds.json 초안을 출력한다")
     parser.add_argument("--roles-sheet", action="store_true", help="역할표 검수 시트를 만든다")
     parser.add_argument("--sheet", action="store_true", help="견종 × 스와치 확인 시트를 만든다")
     args = parser.parse_args()
 
-    if args.photo:
+    if args.photo or args.breed:
         data = load_breeds()
         if args.breed not in data["breeds"]:
             parser.error(f"--breed 는 {', '.join(data['breeds'])} 중 하나")
-        breed = data["breeds"][args.breed]
-        main_name, sub_name = extract_colors(remove_background(load_upright(args.photo)), data["swatches"])
-        main_hex, sub_hex = fit_to_template(
-            breed, data["swatches"].get(main_name), data["swatches"].get(sub_name)
-        )
-        hex_to_name = {v: k for k, v in data["swatches"].items()}
-        main_name, sub_name = hex_to_name.get(main_hex, main_name), hex_to_name.get(sub_hex, sub_name)
-        cmap = color_map(breed, main_hex, sub_hex)
-        (front,) = asset_frames(ASSETS / breed["assets"]["front"])
-        sprite = recolor_image(front, cmap)
-        out = args.out or args.photo.with_name(f"{args.photo.stem}_character.png")
+        sprite, main_name, sub_name = make_character(data["breeds"][args.breed], args.photo, data["swatches"])
+        default = args.photo.with_name(f"{args.photo.stem}_character.png") if args.photo else HERE / "samples" / f"{args.breed}_character.png"
+        out = args.out or default
         sprite.resize((sprite.width * 8, sprite.height * 8), Image.NEAREST).save(out)
         print(f"털색 main={main_name} sub={sub_name}")
         print(f"캐릭터 {out}")

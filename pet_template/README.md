@@ -20,7 +20,7 @@
 **생성형 모델은 쓰지 않는다.** 전부 결정론적 연산이라 온디바이스에서 즉시 돌고 같은 입력에 같은 결과가 나온다.
 견종 분류기도 없다. 견종은 사용자가 고르므로 오답이 없다.
 
-**사진이 없거나 배경 제거·털색 추출이 실패하면** `color_map(breed, None, None)` 이 빈 표를 돌려주고
+**사진이 없거나 읽지 못하거나 배경 제거·털색 추출이 실패하면** `color_map(breed, None, None)` 이 빈 표를 돌려주고
 견종 템플릿 원본색이 그대로 나온다. 가입 흐름을 막지 않는다.
 
 ## 에셋과 역할표
@@ -35,6 +35,7 @@
 
 ```
 python reference.py samples/testdog.png --breed golden   # 사진 → 캐릭터 (8배 확대 PNG)
+python reference.py --breed shiba                         # 사진 없이 → 원본색 캐릭터
 python reference.py --sheet                              # 견종 × 스와치 확인 시트
 python reference.py --roles-sheet                        # 역할표 검수 시트
 python reference.py --suggest-roles                      # breeds.json 초안 출력

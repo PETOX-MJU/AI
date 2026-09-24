@@ -37,7 +37,7 @@ checkpoints/
 
 # 템플릿 확인 시트·결과 (눈 검수용 생성물)
 pet_template/*_sheet.png
-pet_template/samples/*_character.png
+pet_template/**/*_character.png
 
 # 도구 상태 (omc 등)
 .omc/
