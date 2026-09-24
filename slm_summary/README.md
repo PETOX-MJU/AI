@@ -2,6 +2,7 @@
 
 대시보드 한줄 요약을 템플릿 대신 폰에서 도는 작은 언어 모델(SLM)로 만드는 실험.
 **Qwen3.5 0.8B 를 LoRA 로 파인튜닝해 4비트 GGUF(약 540MB)로 배포**하는 것이 현재 후보다.
+모델 파일(`models/ft-v2-q4.gguf`)은 저장소에 넣지 않고 팀 구글 드라이브에 둔다.
 
 > 아직 앱에 붙이지 않았다. 붙일 때는 `kotlin_port/contracts/output.schema.json` 의 `insight.source`(지금은
 > `"template"` 고정)와 대시보드 명세의 "생성형 AI 배지 금지" 규칙을 먼저 고쳐야 한다.
