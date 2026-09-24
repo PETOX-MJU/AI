@@ -172,6 +172,45 @@ def suggest_roles(counts: Counter) -> dict:
     return dict(sorted(roles.items(), key=lambda kv: (ROLES.index(kv[1]), kv[0])))
 
 
+# ── 재색칠 ─────────────────────────────────────────────
+CHROMA_KEEP = 0.3  # 색조 차를 얼마나 남길지. 1 이면 원본 색조 편차 그대로, 0 이면 단색
+MIN_FUR_L = 15  # 털 밝기 하한. 외곽선(L≈3~8)과 붙지 않게 한다
+SVG_FILL = re.compile(r"fill='(#[0-9a-fA-F]{6})'")
+
+
+def color_map(breed: dict, main: str | None, sub: str | None) -> dict:
+    """역할표 + 목표색(hex) → {원본 hex: 새 hex}.
+
+    역할의 기준색(픽셀 수 최다)이 목표색이 되도록 역할 전체를 Lab 에서 옮긴다.
+    색조 차는 CHROMA_KEEP 배로 줄이고, 밝기 차(명암)는 유지하되 [MIN_FUR_L, 100] 에
+    들어가도록 어두운 쪽·밝은 쪽을 각각 비율로 줄인다. 잘라내면(클램프) 음영이 한 색으로 뭉개진다.
+    목표가 None 인 역할은 원본을 유지한다 — 사진 분석이 실패해도 캐릭터는 나온다.
+    """
+    counts = breed_colors(breed)
+    out = {}
+    for role, target in (("main", main), ("sub", sub)):
+        colors = [h for h, r in breed["roles"].items() if r == role]
+        if target is None or not colors:
+            continue
+        base = hex_to_lab(max(colors, key=lambda h: counts[h]))
+        goal = hex_to_lab(target)
+        goal[0] = max(goal[0], MIN_FUR_L)  # 목표색이 하한보다 어두워도 결과 L 은 [MIN_FUR_L, 100] 에 든다
+        deltas = {h: hex_to_lab(h) - base for h in colors}
+        darkest = min(d[0] for d in deltas.values())  # ≤ 0 (기준색 자신이 0)
+        brightest = max(d[0] for d in deltas.values())  # ≥ 0
+        squeeze_dark = min(1.0, max(0.0, goal[0] - MIN_FUR_L) / -darkest) if darkest < 0 else 1.0
+        squeeze_bright = min(1.0, max(0.0, 100 - goal[0]) / brightest) if brightest > 0 else 1.0
+        for h, d in deltas.items():
+            dl = d[0] * (squeeze_dark if d[0] < 0 else squeeze_bright)
+            out[h] = lab_to_hex(goal + np.array([dl, d[1] * CHROMA_KEEP, d[2] * CHROMA_KEEP]))
+    return out
+
+
+def recolor_svg(text: str, cmap: dict) -> str:
+    """SVG 는 fill 문자열만 바꾸면 된다. 앱이 SVG 를 직접 그린다면 이쪽을 쓴다."""
+    return SVG_FILL.sub(lambda m: f"fill='{cmap.get(m.group(1).lower(), m.group(1))}'", text)
+
+
 # ── 재색칠 적용 ─────────────────────────────────────────
 def recolor_image(img: Image.Image, cmap: dict) -> Image.Image:
     """색 치환표를 비트맵에 적용한다. 앱에서 이식할 부분은 이것 하나다 (SVG·GIF 공통)."""
@@ -212,6 +251,15 @@ def roles_sheet(data: dict) -> Image.Image:
     return contact_sheet(rows)
 
 
+def swatch_sheet(data: dict) -> Image.Image:
+    """견종마다 한 줄: 원본 앞모습 + 스와치별 재색칠. 명암이 어색한 조합을 찾는 용도다."""
+    rows = []
+    for breed in data["breeds"].values():
+        (front,) = asset_frames(ASSETS / breed["assets"]["front"])
+        rows.append([front] + [recolor_image(front, color_map(breed, h, None)) for h in data["swatches"].values()])
+    return contact_sheet(rows)
+
+
 def draft_breeds() -> dict:
     """assets/ 를 훑어 breeds.json 초안을 만든다. 새 견종을 추가할 때 쓴다."""
     breeds = {}
@@ -239,6 +287,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--suggest-roles", action="store_true", help="breeds.json 초안을 출력한다")
     parser.add_argument("--roles-sheet", action="store_true", help="역할표 검수 시트를 만든다")
+    parser.add_argument("--sheet", action="store_true", help="견종 × 스와치 확인 시트를 만든다")
     args = parser.parse_args()
 
     if args.suggest_roles:
@@ -247,6 +296,10 @@ def main() -> None:
         out = HERE / "roles_sheet.png"
         roles_sheet(load_breeds()).save(out)
         print(f"역할 검수 시트 {out}")
+    elif args.sheet:
+        out = HERE / "swatch_sheet.png"
+        swatch_sheet(load_breeds()).save(out)
+        print(f"스와치 시트 {out}")
     else:
         parser.print_help()
 
