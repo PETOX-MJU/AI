@@ -191,7 +191,11 @@ def remove_background(image: Image.Image) -> Image.Image | None:
     except ImportError:
         print("[알림] rembg 미설치 — 배경 제거 불가, 원본색으로 진행합니다 (pip install rembg)")
         return None
-    return remove(image).convert("RGBA")
+    try:
+        return remove(image).convert("RGBA")
+    except Exception as e:  # 모델 로드 실패 등 rembg 내부 오류도 원본색으로 진행한다
+        print(f"[알림] 배경 제거 실패({e}) — 원본색으로 진행합니다")
+        return None
 
 
 def extract_colors(img: Image.Image | None, swatches: dict) -> tuple:
@@ -206,8 +210,10 @@ def extract_colors(img: Image.Image | None, swatches: dict) -> tuple:
     if img is None:
         return None, None
     img = img.convert("RGBA")
-    img.thumbnail((256, 256))  # 폰 사진 원본은 너무 크다. 색 비율에는 영향이 없다
-    arr = np.array(img)
+    # 축소 대신 일정 간격으로 픽셀을 건너뛴다(stride). 리샘플링이 없어 원본 픽셀 값
+    # 그대로 쓰므로 경계 색이 섞이지 않고, Kotlin 에서도 같은 결과를 내기 쉽다
+    s = max(1, max(img.size) // 256)
+    arr = np.array(img)[::s, ::s]
     fur = arr[arr[..., 3] > 128][:, :3]
     if len(fur) == 0:
         return None, None
@@ -220,6 +226,31 @@ def extract_colors(img: Image.Image | None, swatches: dict) -> tuple:
 
     (main, _), *rest = area.most_common()
     sub = rest[0][0] if rest and rest[0][1] / len(fur) >= SUB_RATIO else None
+    return main, sub
+
+
+def fit_to_template(breed: dict, main: str | None, sub: str | None) -> tuple:
+    """사진에서 뽑은 (main hex, sub hex) 를 견종 템플릿의 밝기 순서에 맞춘다.
+
+    예: 허스키는 main(회색)이 sub(흰색)보다 어둡다. 그런데 흰 개 사진은 몸의 대부분이
+    흰색이라 main(면적 최다) 이 오히려 더 밝게 나온다 — 그대로 color_map 에 넘기면
+    캐릭터가 명암 반전된다. 역할의 기준색(픽셀 수 최다, color_map 과 같은 규칙) 끼리의
+    밝기(L) 순서와 사진 두 색의 밝기 순서를 비교해, 서로 다르면 맞바꾼다.
+    sub 가 없거나(단색 견종) 사진에 main·sub 중 하나가 없으면 그대로 둔다 — 순서를 셋 중
+    하나만 있을 때 비교할 대상이 없다. 사용자가 스와치를 직접 고른 경우에는 쓰지 않는다
+    (color_map 안에 넣지 않는 이유) — 사용자 선택을 뒤집으면 안 된다.
+    """
+    if main is None or sub is None:
+        return main, sub
+    role_colors = {r: [h for h, rr in breed["roles"].items() if rr == r] for r in ("main", "sub")}
+    if not role_colors["main"] or not role_colors["sub"]:
+        return main, sub
+    counts = breed_colors(breed)
+    base_main_l = hex_to_lab(max(role_colors["main"], key=lambda h: counts[h]))[0]
+    base_sub_l = hex_to_lab(max(role_colors["sub"], key=lambda h: counts[h]))[0]
+    photo_main_l, photo_sub_l = hex_to_lab(main)[0], hex_to_lab(sub)[0]
+    if (base_main_l - base_sub_l) * (photo_main_l - photo_sub_l) < 0:
+        return sub, main
     return main, sub
 
 
@@ -317,26 +348,20 @@ def swatch_sheet(data: dict) -> Image.Image:
 
 
 def draft_breeds() -> dict:
-    """assets/ 를 훑어 breeds.json 초안을 만든다. 새 견종을 추가할 때 쓴다."""
+    """assets/ 를 훑어 breeds.json 초안을 만든다. 새 견종을 추가할 때 쓴다.
+
+    스와치는 기존 breeds.json 이 있으면 그대로 가져온다 — 스와치는 breeds.json 이
+    유일한 출처이고(코드 상수로 중복 관리하지 않는다), 초안에도 같은 스와치가 필요하다.
+    """
+    breeds_path = HERE / "breeds.json"
+    swatches = json.loads(breeds_path.read_text())["swatches"] if breeds_path.is_file() else {}
     breeds = {}
     for folder in sorted(p for p in ASSETS.iterdir() if p.is_dir()):
         files = sorted(p for p in folder.iterdir() if p.suffix in (".svg", ".gif"))
         breed = {"assets": {p.stem: f"{folder.name}/{p.name}" for p in files}}
         breed["roles"] = suggest_roles(breed_colors(breed))
         breeds[folder.name] = breed
-    return {"swatches": SWATCHES, "breeds": breeds}
-
-
-# 사용자가 고를 털색. 사진 색은 여기 중 가장 가까운 것에 붙는다. 실사진으로 조정할 튜닝값.
-SWATCHES = {
-    "black": "#453d3e",  # L≈27. 더 어두우면 음영을 담을 밝기 여유가 없다
-    "brown": "#6e4a32",
-    "red": "#c47a45",
-    "golden": "#e0a860",
-    "cream": "#e8dcc0",
-    "white": "#f4f2ee",
-    "gray": "#8c8a90",
-}
+    return {"swatches": swatches, "breeds": breeds}
 
 
 def main() -> None:
@@ -355,7 +380,12 @@ def main() -> None:
             parser.error(f"--breed 는 {', '.join(data['breeds'])} 중 하나")
         breed = data["breeds"][args.breed]
         main_name, sub_name = extract_colors(remove_background(load_upright(args.photo)), data["swatches"])
-        cmap = color_map(breed, data["swatches"].get(main_name), data["swatches"].get(sub_name))
+        main_hex, sub_hex = fit_to_template(
+            breed, data["swatches"].get(main_name), data["swatches"].get(sub_name)
+        )
+        hex_to_name = {v: k for k, v in data["swatches"].items()}
+        main_name, sub_name = hex_to_name.get(main_hex, main_name), hex_to_name.get(sub_hex, sub_name)
+        cmap = color_map(breed, main_hex, sub_hex)
         (front,) = asset_frames(ASSETS / breed["assets"]["front"])
         sprite = recolor_image(front, cmap)
         out = args.out or args.photo.with_name(f"{args.photo.stem}_character.png")

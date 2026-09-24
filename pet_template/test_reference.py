@@ -14,6 +14,7 @@ from reference import (
     breed_colors,
     color_map,
     extract_colors,
+    fit_to_template,
     frame_colors,
     hex_to_lab,
     hex_to_rgb8,
@@ -92,11 +93,34 @@ def test_color_map_moves_base_exactly_and_keeps_shading():
     assert all(a <= b + 0.5 for a, b in zip(after, after[1:])), "명암 순서가 뒤집혔다"
 
 
+def test_color_map_sub_path_moves_sub_base_and_covers_sub_keys():
+    """sub 목표를 주면 sub 역할의 기준색(픽셀 최다)이 정확히 그 목표로 바뀌고,
+    sub 역할 색 전부가 치환표에 있어야 한다(main 과 같은 규칙이 sub 에도 적용됨을 확인)."""
+    sw = load_breeds()["swatches"]
+    shiba = load_breeds()["breeds"]["shiba"]
+    counts = breed_colors(shiba)
+    subs = [h for h, r in shiba["roles"].items() if r == "sub"]
+    base_sub = max(subs, key=lambda h: counts[h])
+    cmap = color_map(shiba, sw["brown"], sw["white"])
+    assert cmap[base_sub] == sw["white"]
+    assert set(subs) <= set(cmap)
+
+
+def test_color_map_drops_photo_sub_when_breed_has_no_sub_role():
+    """단색 견종(golden)은 sub 역할이 없다 — 사진에서 sub 가 나와도 버려지고 main 만 바뀐다."""
+    sw = load_breeds()["swatches"]
+    golden = load_breeds()["breeds"]["golden"]
+    mains = [h for h, r in golden["roles"].items() if r == "main"]
+    cmap = color_map(golden, sw["brown"], sw["white"])
+    assert set(cmap) == set(mains)
+
+
 def test_extreme_targets_keep_every_shade():
     """검정·흰색은 밝기 여유가 없다. 음영 단계가 하나로 뭉개지거나 외곽선과 붙으면 안 된다."""
+    sw = load_breeds()["swatches"]
     for name, breed in load_breeds()["breeds"].items():
         mains = [h for h, r in breed["roles"].items() if r == "main"]
-        for target in ("#453d3e", "#f4f2ee", "#000000"):
+        for target in (sw["black"], sw["white"], "#000000"):
             cmap = color_map(breed, target, None)
             lost = len(mains) - len(set(cmap.values()))
             if target != "#000000":  # 순검정은 여유가 0 이라 뭉개지는 게 정상 — 하한만 본다
@@ -117,8 +141,9 @@ def test_neutral_target_stays_neutral():
     목표색 자체도 완전한 무채색(b=0)은 아니라서(예: gray 스와치는 b≈-2.9) 절대값 0 을
     기준으로 삼지 않고, 목표의 b 보다 3 이상 더 파래지지 않는지를 본다.
     """
+    sw = load_breeds()["swatches"]
     golden = load_breeds()["breeds"]["golden"]
-    for target in ("#453d3e", "#8c8a90"):
+    for target in (sw["black"], sw["gray"]):
         goal_b = hex_to_lab(target)[2]
         cmap = color_map(golden, target, None)
         assert min(hex_to_lab(v)[2] for v in cmap.values()) >= goal_b - 3, f"{target}: 파란 색조로 넘어갔다"
@@ -204,6 +229,36 @@ def test_near_colors_snap_to_swatch():
     """조명에 조금 틀어진 색도 가장 가까운 스와치로 붙는다. FE 이식 결과를 맞출 기준 사례."""
     sw = load_breeds()["swatches"]
     assert extract_colors(_photo([("#6a4830", 60), ("#f0eee8", 40)]), sw) == ("brown", "white")
+
+
+def test_extract_colors_stride_matches_downscaled_image():
+    """256px 초과 사진도 stride 로 같은 비율이면 같은 결과가 나온다(리샘플링이 아니므로).
+
+    폰 사진 원본 해상도(수천 px)를 흉내낸다 — thumbnail 의 안티앨리어싱이었다면
+    경계 색이 섞여 결과가 달라질 수 있었다.
+    """
+    sw = load_breeds()["swatches"]
+    big = _photo([(sw["white"], 700), (sw["brown"], 300)])
+    small = _photo([(sw["white"], 70), (sw["brown"], 30)])
+    assert big.width > 256
+    assert extract_colors(big, sw) == extract_colors(small, sw) == ("white", "brown")
+
+
+def test_fit_to_template_swaps_to_template_order():
+    """허스키는 main(회색)이 sub(흰색)보다 어둡다. 흰 개 사진처럼 main·sub 가 뒤집혀
+    나오면 캐릭터가 반전되므로, 템플릿의 밝기 순서에 맞게 되돌려야 한다."""
+    sw = load_breeds()["swatches"]
+    breeds = load_breeds()["breeds"]
+    husky = breeds["husky"]
+    # 사진이 뒤집힌 순서(main=흰색, sub=회색)로 나오면 맞바꾼다
+    assert fit_to_template(husky, sw["white"], sw["gray"]) == (sw["gray"], sw["white"])
+    # 이미 템플릿 순서(main=회색, sub=흰색)면 그대로 둔다
+    assert fit_to_template(husky, sw["gray"], sw["white"]) == (sw["gray"], sw["white"])
+    # golden 은 sub 역할이 없다 — 비교할 대상이 없으니 그대로 둔다
+    golden = breeds["golden"]
+    assert fit_to_template(golden, sw["black"], sw["white"]) == (sw["black"], sw["white"])
+    # sub 가 None(추출 실패)이면 그대로 둔다
+    assert fit_to_template(husky, sw["gray"], None) == (sw["gray"], None)
 
 
 if __name__ == "__main__":
