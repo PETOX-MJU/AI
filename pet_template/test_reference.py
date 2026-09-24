@@ -98,12 +98,27 @@ def test_extreme_targets_keep_every_shade():
             cmap = color_map(breed, target, None)
             lost = len(mains) - len(set(cmap.values()))
             if target != "#000000":  # 순검정은 여유가 0 이라 뭉개지는 게 정상 — 하한만 본다
-                # golden 처럼 밝은 하이라이트가 촘촘한(29 단계) 견종은 흰색 근처(여유 L≈3)에서
-                # 8비트 sRGB 반올림으로 극소수(<=2)가 겹칠 수 있다 — 알고리즘 버그가 아니라
-                # 색 공간 해상도의 한계다. CHROMA_KEEP 을 0.3→1.0 으로 올려도 28/29 까지만
-                # 개선돼 근본적으로 못 없앤다(실측 확인). 완전 동일 개수를 요구하진 않는다.
-                assert lost <= 2, f"{name} {target}: 음영이 {lost}개 합쳐졌다"
+                # golden 처럼 음영이 촘촘한(29 단계) 견종은 흰색 근처(여유 L≈3)에서 8비트
+                # sRGB 반올림으로 극소수가 겹칠 수 있다 — 알고리즘 버그가 아니라 색 공간
+                # 해상도의 한계다(CHROMA_KEEP 을 0.3→1.0 으로 올려도 28/29 까지만 개선돼
+                # 근본적으로 못 없앤다, 실측 확인). 무채색 목표(예: 검정)에서는 색조 편차로
+                # 구분되던, L 이 거의 같은 쌍이 chroma_keep 축소로 함께 겹치기도 한다
+                # (골든 검정: 3 쌍). 완전 동일 개수를 요구하진 않는다.
+                assert lost <= 3, f"{name} {target}: 음영이 {lost}개 합쳐졌다"
             assert min(hex_to_lab(v)[0] for v in cmap.values()) >= MIN_FUR_L - 0.5, f"{name} {target}"
+
+
+def test_neutral_target_stays_neutral():
+    """무채색(black·gray) 목표에 원본 색조 편차를 그대로 더하면 반대 색조(파랑)로 넘어간다.
+
+    목표색 자체도 완전한 무채색(b=0)은 아니라서(예: gray 스와치는 b≈-2.9) 절대값 0 을
+    기준으로 삼지 않고, 목표의 b 보다 3 이상 더 파래지지 않는지를 본다.
+    """
+    golden = load_breeds()["breeds"]["golden"]
+    for target in ("#453d3e", "#8c8a90"):
+        goal_b = hex_to_lab(target)[2]
+        cmap = color_map(golden, target, None)
+        assert min(hex_to_lab(v)[2] for v in cmap.values()) >= goal_b - 3, f"{target}: 파란 색조로 넘어갔다"
 
 
 def test_no_target_keeps_original():

@@ -182,8 +182,10 @@ def color_map(breed: dict, main: str | None, sub: str | None) -> dict:
     """역할표 + 목표색(hex) → {원본 hex: 새 hex}.
 
     역할의 기준색(픽셀 수 최다)이 목표색이 되도록 역할 전체를 Lab 에서 옮긴다.
-    색조 차는 CHROMA_KEEP 배로 줄이고, 밝기 차(명암)는 유지하되 [MIN_FUR_L, 100] 에
-    들어가도록 어두운 쪽·밝은 쪽을 각각 비율로 줄인다. 잘라내면(클램프) 음영이 한 색으로 뭉개진다.
+    색조 차는 CHROMA_KEEP 배, 그리고 목표가 기준색보다 덜 선명하면 그 비율만큼 더 줄여서
+    남긴다(무채색 목표에 원본 색조 편차를 그대로 더하면 반대 색조(파랑)로 넘어간다).
+    밝기 차(명암)는 유지하되 [MIN_FUR_L, 100] 에 들어가도록 어두운 쪽·밝은 쪽을 각각
+    비율로 줄인다. 잘라내면(클램프) 음영이 한 색으로 뭉개진다.
     목표가 None 인 역할은 원본을 유지한다 — 사진 분석이 실패해도 캐릭터는 나온다.
     """
     counts = breed_colors(breed)
@@ -195,6 +197,9 @@ def color_map(breed: dict, main: str | None, sub: str | None) -> dict:
         base = hex_to_lab(max(colors, key=lambda h: counts[h]))
         goal = hex_to_lab(target)
         goal[0] = max(goal[0], MIN_FUR_L)  # 목표색이 하한보다 어두워도 결과 L 은 [MIN_FUR_L, 100] 에 든다
+        base_chroma = float(np.hypot(base[1], base[2]))
+        goal_chroma = float(np.hypot(goal[1], goal[2]))
+        chroma_keep = CHROMA_KEEP if base_chroma == 0 else CHROMA_KEEP * min(1.0, goal_chroma / base_chroma)
         deltas = {h: hex_to_lab(h) - base for h in colors}
         darkest = min(d[0] for d in deltas.values())  # ≤ 0 (기준색 자신이 0)
         brightest = max(d[0] for d in deltas.values())  # ≥ 0
@@ -202,7 +207,7 @@ def color_map(breed: dict, main: str | None, sub: str | None) -> dict:
         squeeze_bright = min(1.0, max(0.0, 100 - goal[0]) / brightest) if brightest > 0 else 1.0
         for h, d in deltas.items():
             dl = d[0] * (squeeze_dark if d[0] < 0 else squeeze_bright)
-            out[h] = lab_to_hex(goal + np.array([dl, d[1] * CHROMA_KEEP, d[2] * CHROMA_KEEP]))
+            out[h] = lab_to_hex(goal + np.array([dl, d[1] * chroma_keep, d[2] * chroma_keep]))
     return out
 
 
