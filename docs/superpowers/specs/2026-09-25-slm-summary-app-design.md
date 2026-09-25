@@ -1,6 +1,6 @@
 # 한줄 요약 SLM 앱 연결 설계 (시연용)
 
-2026-09-25 · 상태: 설계 승인 대기
+2026-09-25 · 상태: 설계 승인 (2026-09-26, "AI" 표시 제외)
 
 ## 목표
 
@@ -10,7 +10,7 @@ v2 모델(`slm_summary/models/ft-v2-q4.gguf`, 541MB)을 FE 앱 대시보드에 �
 
 ```
 분석기(Kotlin, 변경 없음) → insights[0] 템플릿 문장 ─┬─ 즉시 표시
-                                                  └─ SLM 생성 → 검사 통과 → 교체 + "AI" 표시
+                                                  └─ SLM 생성 → 검사 통과 → 교체
                                                                  실패 → 템플릿 유지
 ```
 
@@ -20,9 +20,9 @@ v2 모델(`slm_summary/models/ft-v2-q4.gguf`, 541MB)을 FE 앱 대시보드에 �
 |---|---|
 | `insights[0]` 한 문장만 SLM 으로 바꾸기 | `insights[1..]` 변환 (화면에 안 나온다) |
 | 출력 검사, 실패 시 템플릿 대체 | 모델 다운로드 (v3 이후, 배포 시) |
-| 제목에 반려견 이름, SLM 문장일 때 "AI" 표시 | RAM 기준 기기 판별 (실측 뒤 기준을 정한다) |
+| 제목에 반려견 이름 | RAM 기준 기기 판별 (실측 뒤 기준을 정한다) |
 | 모델 adb 배치 (디버그 빌드) | 설정에서 끄기, 모델 상주 캐시 |
-| 실기기 속도·메모리 측정 | 사전 고지 문구 (출시 때 약관·온보딩) |
+| 실기기 속도·메모리 측정 | "AI" 표시·사전 고지 문구 (출시 때, 아래 「결정」) |
 
 ## 결정
 
@@ -31,8 +31,9 @@ v2 모델(`slm_summary/models/ft-v2-q4.gguf`, 541MB)을 FE 앱 대시보드에 �
 - **런타임은 `llama.rn`** (MIT, llama.cpp 바인딩). 동봉된 llama.cpp 가 `qwen35` 아키텍처를 지원함을 확인했다
   (`vendor/llama.cpp/src/llama-arch.cpp`). FE 는 React Native 0.87, New Architecture.
 - **검사·조사 채우기는 TS 로 옮긴다.** Python 정본(`slm_summary/bench.py`, `data.py`)과의 일치는 대조 JSON 으로 테스트한다.
-- **"AI" 표시:** 인공지능기본법 제31조 제2항(생성형 AI 결과물 표시). 서비스 안에서만 보이는 결과물은 화면 안내·로고 등
-  유연한 표시가 허용되므로 제목 옆 작은 "AI" 로 충족한다. 계도기간(최소 1년) 중이고 시연은 상용 서비스가 아니다.
+- **"AI" 표시는 시연에서 뺀다.** 시연은 상용 서비스가 아니고 과태료 계도기간(최소 1년) 중이다. **출시 때는 필요하다:**
+  인공지능기본법 제31조 제2항(생성형 AI 결과물 표시)과 제1항(사전 고지). 서비스 안에서만 보이는 결과물은
+  화면 안내·로고 등 유연한 표시가 허용되므로 제목 옆 작은 "AI" 와 약관·온보딩 고지 한 줄이면 된다고 본다.
   출시 전 인공지능기본법 지원데스크에 확인한다.
 
 ## FE 변경 (`PETOX-MJU/FE`, 브랜치 `feat/slm-summary`)
@@ -42,7 +43,7 @@ v2 모델(`slm_summary/models/ft-v2-q4.gguf`, 541MB)을 FE 앱 대시보드에 �
 | `src/features/screentime/slmCheck.ts` (새) | 순수 함수: `toFact`, `check`, `meaningErrors`, `markerErrors`, `hasBatchim`, `fill`. 네이티브 import 없음 |
 | `src/features/screentime/slm.ts` (새) | llama.rn 호출: 불러오기 → 생성 → 검사 → 해제. `rewriteSummary()` 하나만 내보낸다 |
 | `src/features/screentime/dashboard.ts` | `AnalysisOutput.insights` 에 `evidence` 추가 |
-| `src/screens/ScreentimeDashboardScreen.tsx` | 제목에 반려견 이름, 따옴표 제거, SLM 문장 교체와 "AI" 표시 |
+| `src/screens/ScreentimeDashboardScreen.tsx` | 제목에 반려견 이름, 따옴표 제거, SLM 문장 교체 |
 | `package.json` | `llama.rn` 추가 |
 | `__tests__/slmCheck.test.ts` (새) | 대조 JSON 으로 Python 판정과 일치 확인, `toFact` 단위 테스트 |
 
@@ -70,7 +71,6 @@ v2 모델(`slm_summary/models/ft-v2-q4.gguf`, 541MB)을 FE 앱 대시보드에 �
 - 제목 스티커: `${이름}의 한줄 요약`. 이름은 `loadPetProfile()?.name` (온보딩에서 지은 이름, 계정별 AsyncStorage).
   비었거나 로그인 전·프로필 없음이면 `한줄 요약`. 8자 넘으면 8자 + `…`. 템플릿 문장일 때도 같은 제목(깜빡임 방지).
 - 문장: 따옴표 없이 표시한다 (템플릿·SLM 공통).
-- "AI" 표시: SLM 문장이 표시될 때만 제목 스티커 옆에 작게.
 
 ### 모델 배치 (시연용)
 
@@ -95,7 +95,7 @@ adb shell run-as com.petoxmju.petox cp /data/local/tmp/ft-v2-q4.gguf files/
 
 1. **jest 대조:** TS 검사 판정·`fill` 결과가 대조 JSON 의 Python 결과와 전부 같다.
 2. **`toFact` 단위:** `NIGHT_TOP_APP` 패키지명 → `{앱}`, 다른 코드는 원문 그대로.
-3. **에뮬레이터(Pixel_8):** 모델 있음 → 이름 제목 + SLM 문장 + "AI". 모델 파일 삭제 → 템플릿 문장, "AI" 없음. 스크린샷으로 확인.
+3. **에뮬레이터(Pixel_8):** 모델 있음 → 이름 제목 + SLM 문장(logcat 에 생성 성공 로그). 모델 파일 삭제 → 템플릿 문장. 스크린샷으로 확인.
 4. **실기기:** 불러오기 시간, 생성 시간(tok/s), 메모리 최대치(`dumpsys meminfo`). 폰 연결이 필요하다.
 
 ## 위험
