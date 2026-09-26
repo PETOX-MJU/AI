@@ -1,0 +1,11 @@
+# 모델·학습 산출물 — 커밋하지 않는다 (README 「재현」 참고)
+base/
+fused/
+ft-hf/
+adapters*/
+models/
+llama.cpp-src/
+data/
+results/
+*.gguf
+*.log
