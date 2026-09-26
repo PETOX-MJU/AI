@@ -27,6 +27,7 @@ def mutations(out: str) -> list[str]:
         out.replace("줄", "늘", 1),
         out.replace("늘", "줄", 1),
         re.sub(r"\{앱(:[^}]*)?\}", "그 앱", out, count=1),
+        re.sub(r"\{앱(:[^}]*)?\}", "{앱:를}", out, count=1),
         out + " {앱}도요.",
         out + " 다음 주도 화이팅.",
         out.replace("요", "요 수면", 1),
