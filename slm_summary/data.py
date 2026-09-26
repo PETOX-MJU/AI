@@ -21,12 +21,18 @@ JOSA = {"을": ("을", "를"), "이": ("이", "가"), "은": ("은", "는"), "�
 MARKER = re.compile(r"\{앱(?::(" + "|".join(JOSA) + r"))?\}")
 
 
+LETTER_BATCHIM = "lmnr013678"  # 약어·숫자는 글자 이름으로 읽는다: 엘·엠·엔·알, 영·일·삼·육·칠·팔 (구=9 는 받침 없음)
+
+
 def has_batchim(word: str) -> bool:
-    ch = word.strip()[-1]
+    w = word.strip()
+    ch = w[-1]
     if "가" <= ch <= "힣":
         return (ord(ch) - 0xAC00) % 28 != 0
-    # 영문·숫자로 끝나면 읽는 소리 기준: TV(티비), X(엑스) 처럼 모음으로 끝나는 게 대부분이다
-    return ch.lower() in "lmnr0136789"
+    if w[-2:].isupper() or len(w) == 1 or ch.isdigit():  # TV(티비), KT(케이티), X(엑스)
+        return ch.lower() in LETTER_BATCHIM
+    # 단어는 소리 기준: TikTok(톡), Instagram(그램), Facebook(북), Bing(빙). 끝 e 는 대개 묵음(YouTube→튜브)
+    return w.lower().endswith("ng") or ch.lower() in "lmnrkpt"
 
 
 def fill(text: str, app: str) -> str:
