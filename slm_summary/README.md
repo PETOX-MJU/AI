@@ -4,8 +4,15 @@
 **Qwen3.5 0.8B 를 LoRA 로 파인튜닝해 4비트 GGUF(약 540MB)로 배포**하는 것이 현재 후보다.
 모델 파일(`models/ft-v2-q4.gguf`)은 저장소에 넣지 않고 팀 구글 드라이브에 둔다.
 
-> 아직 앱에 붙이지 않았다. 붙일 때는 `kotlin_port/contracts/output.schema.json` 의 `insight.source`(지금은
-> `"template"` 고정)와 대시보드 명세의 "생성형 AI 배지 금지" 규칙을 먼저 고쳐야 한다.
+> **앱 연결(시연):** FE `feat/slm-summary` 가 대시보드 한줄 요약(`insights[0]`)을 이 모델로 바꿔 쓴다. 분석기 출력 계약은 그대로
+> (`source: "template"`)이고, 검사에 실패하거나 모델이 없으면 템플릿 문장을 쓴다. 모델은 디버그 빌드에 adb 로 넣는다:
+>
+> ```bash
+> adb push models/ft-v2-q4.gguf /data/local/tmp/
+> adb shell "cat /data/local/tmp/ft-v2-q4.gguf | run-as com.petoxmju.petox sh -c 'mkdir -p files && cat > files/ft-v2-q4.gguf'"
+> ```
+>
+> 검사 규칙을 바꾸면 `python export_cases.py` 결과를 FE `__tests__/fixtures/slmCases.json` 으로 복사한다.
 
 ## 설계
 
