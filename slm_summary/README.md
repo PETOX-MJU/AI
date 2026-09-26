@@ -2,7 +2,8 @@
 
 대시보드 한줄 요약을 템플릿 대신 폰에서 도는 작은 언어 모델(SLM)로 만드는 실험.
 **Qwen3.5 0.8B 를 LoRA 로 파인튜닝해 4비트 GGUF(약 540MB)로 배포**하는 것이 현재 후보다.
-모델 파일(`models/ft-v2-q4.gguf`)은 저장소에 넣지 않고 팀 구글 드라이브에 둔다.
+모델 파일(`models/ft-v2-q4.gguf`)은 저장소에 넣지 않고 [Releases `slm-summary-v2`](https://github.com/PETOX-MJU/AI/releases/tag/slm-summary-v2)에 둔다
+(`gh release download slm-summary-v2 --repo PETOX-MJU/AI`).
 
 > **앱 연결(시연):** FE `feat/slm-summary` 가 대시보드 한줄 요약(`insights[0]`)을 이 모델로 바꿔 쓴다. 분석기 출력 계약은 그대로
 > (`source: "template"`)이고, 검사에 실패하거나 모델이 없으면 템플릿 문장을 쓴다. 모델은 디버그 빌드에 adb 로 넣는다:
