@@ -31,6 +31,8 @@ def mutations(out: str) -> list[str]:
         out + " {앱}도요.",
         out + " 다음 주도 화이팅.",
         out.replace("요", "요 수면", 1),
+        out.replace("요", "요 모두 달성", 1),
+        out * 3,
         out + " ok",
         "",
     ]

@@ -12,7 +12,8 @@
 > adb shell "cat /data/local/tmp/ft-v2-q4.gguf | run-as com.petoxmju.petox sh -c 'mkdir -p files && cat > files/ft-v2-q4.gguf'"
 > ```
 >
-> 검사 규칙을 바꾸면 `python export_cases.py` 결과를 FE `__tests__/fixtures/slmCases.json` 으로 복사한다.
+> 검사 규칙을 바꾸면 `python export_cases.py`(먼저 「재현」의 `eval_ft.py gguf` 명령들로
+> `results/ft-v2-q4*_{A,B}.json` 을 만들어 둬야 한다) 결과를 FE `__tests__/fixtures/slmCases.json` 으로 복사한다.
 
 ## 설계
 

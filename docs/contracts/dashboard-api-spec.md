@@ -195,8 +195,12 @@ mock은 §1의 예제 JSON(golden)을 그대로 쓴다.
 
 - 대시보드 상단에서 `analysis.insights[0].text`를 **이번 주 한줄 요약**으로 표시한다.
 - 카드 제목 권장안: `이번 주 한줄 요약` 또는 `이번 주 사용 패턴`.
-- 문장은 서버나 생성형 LLM이 아니라 Kotlin 분석 결과에 기반한 결정론적 template이다.
-  따라서 `AI가 생성함`, `생성형 AI 요약` 같은 배지를 붙이지 않는다.
+- 문장은 서버나 생성형 LLM이 아니라 Kotlin 분석 결과에 기반한 결정론적 template이다. 분석기(`kotlin_port`)는
+  항상 template만 만들고 생성형 AI를 호출하지 않는다.
+- FE는 이 template 문장을 온디바이스 SLM(`slm.ts`)으로 반려동물 말투로 다시 쓸 수 있다. 검사(`slmCheck.ts`)를
+  모두 통과했을 때만 교체하고, 하나라도 실패하면 template 문장을 그대로 보여준다. 분석기 출력의 `source`는
+  이 경우에도 항상 `template`이다. 시연에는 "AI" 표시가 없다. 출시 때는 AI 표시와 사전 고지(인공지능기본법
+  제31조)가 필요하다 — `docs/superpowers/specs/2026-09-25-slm-summary-app-design.md`의 「결정」 참고.
 - `insights=[]`이면 카드를 숨긴다. UI가 임의 문장을 생성하거나 외부 AI를 호출하지 않는다.
 - 한 문장이 길어져도 중간을 말줄임표로 숨기지 않는다. 기본 2~3줄까지 허용하고 전체 문장을 읽을 수 있어야 한다.
 - `INSUFFICIENT_DATA`도 유효한 한줄 요약이다. 이 경우 부족 상태 안내와 중복되지 않도록
@@ -206,7 +210,9 @@ mock은 §1의 예제 JSON(golden)을 그대로 쓴다.
 #### 데이터 사용 규칙
 
 - 화면에는 `text`를 그대로 표시한다. UI에서 숫자를 재계산해 문장을 덮어쓰지 않는다.
-- `source`는 항상 `template`이며 사용자에게 `AI 생성` 배지를 붙이지 않는다.
+- `source`는 항상 `template`이다(분석기는 생성형 AI를 호출하지 않는다). FE가 SLM 검사 통과 시
+  화면 문장만 pet 말투로 바꿔 보여줄 수 있으나, 사용자에게 `AI 생성` 배지를 붙이지 않는다(시연 기준;
+  출시 때 표시 요건은 위 4.6 참고).
 - `evidence`는 QA·accessibility 설명 연결용이다. 사용자에게 raw JSON을 노출하지 않는다.
 - 가능한 `code`:
   - `SELECTED_USAGE_DECREASED`
@@ -342,7 +348,7 @@ mock은 §1의 예제 JSON(golden)을 그대로 쓴다.
 - 실제 수면 시간 또는 잠든 시각
 - 물리적인 화면 켜짐 시간
 - 통계적 유의성
-- 생성형 AI가 만든 것처럼 보이는 배지
+- 생성형 AI가 만든 것처럼 보이는 배지 (SLM 이 문장을 바꿔 쓴 경우도 시연에서는 표시하지 않는다)
 - 확인 불가 데이터를 0으로 바꾼 합계·달성률
 
 ---
@@ -357,7 +363,7 @@ mock은 §1의 예제 JSON(golden)을 그대로 쓴다.
 품질: complete / partial / unavailable
 미션: 진행 중 / 달성 / 미달성 / 확인 불가 / 해당 없음
 그래프: 누락일을 0 막대로 표현하지 않음
-문장: insights[].text 그대로, source=template. 생성형 AI 배지 금지
+문장: insights[0] 은 SLM 이 검사 통과 시만 바꿔 씀, 아니면 text 그대로. source=template. AI 표시는 출시 때
 목표: 제안은 자동 적용 금지. 수락/수정/유지 후 다음 미시작 구간부터 적용
 보안: 분석은 전부 온디바이스. 서버가 없어도 dashboard 동작
 mock: complete-week.output.json + insufficient-data.output.json
