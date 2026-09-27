@@ -154,12 +154,14 @@ def target_night(rng, mins, share, purpose) -> str:
         opts += [
             f"밤 사용의 {s}가 {a('이었')}어요, {n}이었어요.",
             f"밤에는 {a('을')} {n} 썼어요, 밤 사용의 {s}예요.",
-            f"밤 시간의 {s}를 {a('이')} 차지했어요.",
+            f"밤 사용의 {s}를 {a('이')} 차지했어요.",  # v2 의 "밤 시간의" 는 틀린 말이었다: 밤 시간 전체가 아니라 관리 앱 야간 사용 중 비중
         ]
     if purpose:
         opts += [
+            # 용도는 문장 끝에만 둔다. v2 에서 "'{용도}'용으로 정한 …" 으로 시작하는 틀이 비중 틀과 섞여
+            # "'학습'용 92.8%를 틱톡이 차지했어요" 같은 문장이 나왔다
             f"밤엔 {a('을')} {n} 썼어요, '{purpose}' 용도로 정해 둔 앱이에요.",
-            f"'{purpose}'용으로 정한 {a('을')} 밤에 {n} 썼어요.",
+            f"잠들기 전후로 {a('을')} {n} 썼어요, '{purpose}'용으로 정해 둔 앱이죠.",
         ]
     return rng.choice(opts)
 
@@ -175,17 +177,8 @@ def mission_clause(rng, kind: str, s: int, e: int) -> str:
 
 
 def target_missions(rng, ds, de, ns, ne) -> str:
-    # 둘 다 전부 성공이거나 둘 다 0개면 한 절로 묶어 같은 말을 되풀이하지 않는다
-    if de and ne and ds == de and ns == ne:
-        return rng.choice([
-            f"이번 주 일일 미션 {de}개, 야간 미션 {ne}개를 모두 해냈어요!",
-            f"일일 {de}개, 야간 {ne}개 미션을 전부 성공했어요, 최고예요!",
-        ])
-    if de and ne and ds == 0 and ns == 0:
-        return rng.choice([
-            f"이번 주는 일일 {de}개, 야간 {ne}개 미션을 하나도 못 채웠지만 다음 주엔 같이 해봐요.",
-            f"일일 미션 {de}개, 야간 미션 {ne}개 모두 아쉬웠어요, 다음 주에 다시 도전해요.",
-        ])
+    # 두 미션을 한 절로 묶는 틀("일일 …, 야간 … 미션을 전부 성공했어요")은 쓰지 않는다. 0.8B 는 이 틀의 앞부분만 보고
+    # 뒤를 "전부 성공"으로 이어 붙여, 일일 5개 중 0개인 주에도 전부 성공이라고 썼다(v3a·v3b). 두 절로 나눠 절마다 판정한다
     daily, night = mission_clause(rng, "일일", ds, de), mission_clause(rng, "야간", ns, ne)
     return rng.choice([f"{daily}, {night}.", f"이번 주 {daily}, {night}."])
 
@@ -236,7 +229,9 @@ def sample(rng: random.Random, extreme: bool = False) -> tuple[str, str]:
         de, ne = rng.randint(0, 7), rng.randint(0, 7)
         if de == ne == 0:
             de = rng.randint(1, 7)
-        r = rng.random()  # 전부 성공·전부 0 조합이 드물어서 일부러 섞는다
+        # 전부 성공·전부 0 조합이 드물어서 일부러 섞는다. v3 첫 학습에서 각 25% 로 올렸더니 묶는 틀을
+        # 맞지 않는 경우에까지 썼다 — v2 비율로 되돌린다
+        r = rng.random()
         ds = de if r < 0.2 else 0 if r < 0.35 else rng.randint(0, de)
         ns = ne if r < 0.2 else 0 if r < 0.35 else rng.randint(0, ne)
         return fact_missions(lead, ds, de, ns, ne), target_missions(rng, ds, de, ns, ne)
@@ -269,7 +264,7 @@ def to_chat(fact: str, target: str) -> dict:
 def main() -> None:
     import bench  # 정답도 같은 검사를 통과해야 한다
 
-    rng = random.Random(2000)
+    rng = random.Random(3002)  # v3
     out = HERE / "data"
     out.mkdir(exist_ok=True)
     for name, n, extreme in (("train", 3000, False), ("valid", 150, False), ("test_b", 200, True)):

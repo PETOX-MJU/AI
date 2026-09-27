@@ -128,6 +128,35 @@ def meaning_errors(facts: list[str], out: str) -> list[str]:
             errs.append(f"{m.group(1)} 방향(줄) 틀림")
     if re.search(r"모두 (달성|완료)|다 달성", body) and not any(a == b for a, b in re.findall(r"(\d+)개 중 (\d+)개", fact)):
         errs.append("모두 달성 아님")
+    errs += mission_claim_errors(fact, body)
+    return errs
+
+
+ALL_CLAIM = re.compile(r"모두 (해냈|달성|성공)|전부 성공|다 해냈")
+NONE_CLAIM = re.compile(r"하나도 못|못 채웠|모두 아쉬웠")
+
+
+def mission_claim_errors(fact: str, body: str) -> list[str]:
+    """절마다 "모두 해냈다"·"하나도 못했다" 같은 판정 말이 사실과 맞는지 본다.
+    v3 첫 학습이 일일 1개 중 0개·야간 3개 중 3개를 "하나도 못 채웠지만"으로 쓴 것을 숫자 검사로는 못 잡았다."""
+    pairs = {kind: (int(e), int(s)) for kind, e, s in re.findall(r"(일일|야간) (?:미션은 )?(\d+)개 중 (\d+)개", fact)}
+    errs, pending = [], ""
+    for part in re.split(r"[,.!]", body):
+        # 서술어 없는 쉼표 조각("일일 3개, 야간 3개 미션을 …")은 뒤 조각과 한 절이다
+        clause, pending = pending + part, ""
+        if not re.search(r"(요|다)\s*$", clause.strip()):
+            pending = clause
+            continue
+        claims_all, claims_none = ALL_CLAIM.search(clause), NONE_CLAIM.search(clause)
+        if not (claims_all or claims_none):
+            continue
+        kinds = [k for k in ("일일", "야간") if k in clause] or ["일일", "야간"]
+        for kind in kinds:
+            e, s = pairs.get(kind, (0, -1))
+            if claims_all and not (e > 0 and s == e):
+                errs.append(f"{kind} 전부 달성 아님")
+            if claims_none and not (e > 0 and s == 0):
+                errs.append(f"{kind} 0개 아님")
     return errs
 
 

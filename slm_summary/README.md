@@ -2,18 +2,19 @@
 
 대시보드 한줄 요약을 템플릿 대신 폰에서 도는 작은 언어 모델(SLM)로 만드는 실험.
 **Qwen3.5 0.8B 를 LoRA 로 파인튜닝해 4비트 GGUF(약 540MB)로 배포**하는 것이 현재 후보다.
-모델 파일(`models/ft-v2-q4.gguf`)은 저장소에 넣지 않고 팀 구글 드라이브에 둔다.
+모델 파일(`models/ft-v3-q4.gguf`, 이전 `ft-v2-q4.gguf`)은 저장소에 넣지 않고 팀 구글 드라이브에 둔다.
 
 > **앱 연결(시연):** FE `feat/slm-summary` 가 대시보드 한줄 요약(`insights[0]`)을 이 모델로 바꿔 쓴다. 분석기 출력 계약은 그대로
 > (`source: "template"`)이고, 검사에 실패하거나 모델이 없으면 템플릿 문장을 쓴다. 모델은 디버그 빌드에 adb 로 넣는다:
 >
 > ```bash
-> adb push models/ft-v2-q4.gguf /data/local/tmp/
-> adb shell "cat /data/local/tmp/ft-v2-q4.gguf | run-as com.petoxmju.petox sh -c 'mkdir -p files && cat > files/ft-v2-q4.gguf'"
+> adb push models/ft-v3-q4.gguf /data/local/tmp/
+> adb shell "cat /data/local/tmp/ft-v3-q4.gguf | run-as com.petoxmju.petox sh -c 'mkdir -p files && cat > files/ft-v3-q4.gguf'"
 > ```
 >
 > 검사 규칙을 바꾸면 `python export_cases.py`(먼저 「재현」의 `eval_ft.py gguf` 명령들로
-> `results/ft-v2-q4*_{A,B}.json` 을 만들어 둬야 한다) 결과를 FE `__tests__/fixtures/slmCases.json` 으로 복사한다.
+> `results/ft-v3-q4*_{A,B}.json`, `ft-v3b-q4*_A.json` 을 만들어 둬야 한다) 결과를 FE `__tests__/fixtures/slmCases.json` 으로 복사한다.
+> v3 에서 미션 판정 검사(`bench.mission_claim_errors`)를 추가했다 — FE `slmCheck.ts` 에도 같은 규칙이 있어야 한다.
 
 ## 설계
 
@@ -25,6 +26,8 @@
 - **출력은 검사하고, 실패하면 템플릿 문장을 그대로 쓴다.** 앱에 넣을 검사:
   - 숫자: 출력의 모든 숫자(단위 포함)가 사실에 있다 (`bench.meaning_errors`)
   - 방향: 줄어든 값을 "늘었다"로 쓰지 않는다
+  - 미션 판정: 절마다 "모두 해냈다·전부 성공"은 그 미션이 정말 전부 달성일 때만, "하나도 못·아쉬웠다"는 0개일 때만
+    (`bench.mission_claim_errors`). 숫자가 전부 사실에 있어도 판정 말이 뒤집힐 수 있어서 따로 본다
   - 형식: 한 문장, 90자 이하, 한자·가나·사실에 없는 로마자 없음, 금지어 없음 (`bench.check`)
   - 자리표시: `{앱}` 이 사실에 있으면 정확히 한 번 (`data.marker_errors`)
 
@@ -50,17 +53,18 @@ brew install llama.cpp
 python data.py                                     # data/train.jsonl 3000, valid 150, test_b 200
 .venv/bin/python -m mlx_lm lora --model base --train --data data --mask-prompt --num-layers -1 \
   --batch-size 4 --iters 1500 --learning-rate 1e-4 --max-seq-length 256 --grad-checkpoint \
-  --adapter-path adapters-v2 --seed 0             # M3 Pro 약 1시간 40분. 메모리가 빠듯하면 스왑으로 멈춘다
+  --save-every 250 --adapter-path adapters-v3 --seed 0   # M3 Pro 약 1시간 50분. 메모리가 빠듯하면 스왑으로 멈춘다
+# Metal "GPU Hang" 으로 죽으면 마지막 체크포인트에서 이어 간다: --resume-adapter-file adapters-v3/0001000_adapters.safetensors
 
 # GGUF 변환 (llama.cpp 저장소의 변환기. torch·gguf 가 든 별도 venv)
-.venv/bin/python -m mlx_lm fuse --model base --adapter-path adapters-v2 --save-path fused
-.venv/bin/python merge_hf.py adapters-v2           # fused/ 를 통째로 쓰지 않는 이유는 파일 머리말 참고
+.venv/bin/python -m mlx_lm fuse --model base --adapter-path adapters-v3 --save-path fused
+.venv/bin/python merge_hf.py adapters-v3           # fused/ 를 통째로 쓰지 않는 이유는 파일 머리말 참고
 git clone --depth 1 https://github.com/ggml-org/llama.cpp llama.cpp-src
-.conv/bin/python llama.cpp-src/convert_hf_to_gguf.py ft-hf --outfile models/ft-v2-f16.gguf --outtype f16
-llama-quantize models/ft-v2-f16.gguf models/ft-v2-q4.gguf Q4_K_M
+.conv/bin/python llama.cpp-src/convert_hf_to_gguf.py ft-hf --outfile models/ft-v3-f16.gguf --outtype f16
+llama-quantize models/ft-v3-f16.gguf models/ft-v3-q4.gguf Q4_K_M
 
-python eval_ft.py gguf models/ft-v2-q4.gguf                # 온도 0
-python eval_ft.py gguf models/ft-v2-q4.gguf --temp=0.5     # 요청마다 시드를 바꿔 다양성까지
+python eval_ft.py gguf models/ft-v3-q4.gguf                # 온도 0
+python eval_ft.py gguf models/ft-v3-q4.gguf --temp=0.5     # 요청마다 시드를 바꿔 다양성까지
 ```
 
 ## 모델 선택 (학습 전, 2026-09-24)
@@ -112,9 +116,33 @@ v1 문제 해결: 네 자리 숫자는 세트 B 온도 0 에서 전부 맞게 �
 남은 문제 (v3 에서 고친다):
 - 온도 0.5 에서 틀이 섞이는 경우가 가끔 있다. 세트 A "'학습'용 92.8%를 틱톡이 차지했어요"(사용 목적과 비중을 섞음),
   세트 B "밤 사용의 4282분이었어요"(숫자 오류라 검사에 걸림).
-- `data.py` 의 틀 "밤 시간의 {s}를 {앱:이} 차지했어요" 는 뜻이 부정확하다. 이 비중은 밤 시간 전체가 아니라
-  **관리 앱 야간 사용** 중 비중이다. "밤 사용의" 로 고쳐야 한다(v2 는 이 틀로 학습했으므로 재현을 위해 그대로 둔다).
+- 틀 "밤 시간의 {s}를 {앱:이} 차지했어요" 는 뜻이 부정확하다. 이 비중은 밤 시간 전체가 아니라
+  **관리 앱 야간 사용** 중 비중이다. v2 를 다시 만들려면 커밋 `92e0b1b` 의 `data.py` 를 쓴다.
 - 미션이 둘 다 0개일 때 한 절로 묶는 틀이 있는데도 "다음엔 해낼 수 있어요"를 두 번 쓰는 경우가 있다.
+
+### v3 (2026-09-27) — 비중 문구·용도 틀 수정, 두 미션을 묶는 틀 제거
+
+v2 대비 바꾼 것: "밤 시간의" → "밤 사용의", 용도로 시작하는 틀 삭제(용도는 문장 끝에만), 두 미션을 한 절로 묶는 틀 삭제.
+학습 3000개·1500스텝(검증 손실 0.104). 4비트 541MB, 맥 CPU 4스레드 86~90 tok/s.
+
+| | v2 (온도 0.5) | v3 (온도 0) | v3 (온도 0.5) |
+|---|---|---|---|
+| 세트 A 자동 검사 통과 (미션 판정 검사 포함) | 97/97 | 97/97 | 97/97 |
+| 세트 A 뜻 틀림 (사람 채점) | 1/97 | — | **0/97** |
+| 세트 A 서로 다른 문장 틀 | 44 | 26 | 44 |
+| 세트 B 자동 검사 통과 | 199/200 | **200/200** | 198/200 |
+
+세트 B 실패 2건은 비중이 없는 사실에 비중 틀을 쓰다 `{앱}` 을 두 번 쓴 것으로, 자리표시 검사에 걸린다.
+
+**중간에 버린 두 번의 시도 (같은 실수를 하지 않도록):**
+- **v3a** — 둘 다 전부 성공·둘 다 0개일 때 쓰는 "한 절로 묶는 틀"(`일일 5개, 야간 3개 미션을 전부 성공했어요`)의
+  비율을 15~20% → 25% 로 올렸다. 모델이 맞지 않는 주에도 이 틀을 써서 일일 1개 중 0개·야간 3개 중 3개를
+  "하나도 못 채웠지만"으로 썼다(세트 A 6/97). 숫자는 모두 사실에 있어서 기존 검사로는 못 잡았다 → 미션 판정 검사를 추가했다.
+- **v3b** — 묶는 틀에 "N개 중 M개"를 넣고 비율을 되돌렸다. 모델은 숫자는 맞게 옮기면서도 틀 앞부분만 보고
+  "전부 성공"을 이어 붙였다(일일 5개 중 0개인데 "전부 성공", 세트 A 4/97). 0.8B 에게 "앞에 나열하고 끝에서 판정"하는
+  틀은 맞지 않는다 → 묶는 틀을 없애고 두 절로 나눠 절마다 판정하게 했다(v3). 대가로 둘 다 0개인 주에는
+  "…아쉬웠어요, …아쉬웠어요" 처럼 같은 말이 두 번 나온다.
+- v3a 학습은 1130스텝에서 Metal GPU Hang 으로 죽었다. `--save-every 250` 으로 두고, 죽으면 체크포인트에서 이어 간다.
 
 ## 알려진 한계
 

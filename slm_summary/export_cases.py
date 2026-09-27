@@ -11,7 +11,8 @@ import bench
 from data import fill, marker_errors
 
 HERE = Path(__file__).resolve().parent
-SOURCES = ["ft-v2-q4_t0.5_A.json", "ft-v2-q4_t0.5_B.json", "ft-v2-q4_A.json"]
+# v3 출력 + v3b 출력(두 미션을 묶는 틀 때문에 "전부 성공"을 잘못 쓴 실제 사례가 있다)
+SOURCES = ["ft-v3-q4_t0.5_A.json", "ft-v3-q4_t0.5_B.json", "ft-v3-q4_A.json", "ft-v3b-q4_A.json", "ft-v3b-q4_t0.5_A.json"]
 APPS = ["YouTube", "Instagram", "TikTok", "치지직", "아프리카TV", "유튜브", "네이버 웹툰", "TV", "X", "Bing", "KT", "앱9"]
 
 
@@ -32,6 +33,8 @@ def mutations(out: str) -> list[str]:
         out + " 다음 주도 화이팅.",
         out.replace("요", "요 수면", 1),
         out.replace("요", "요 모두 달성", 1),
+        out.replace("해냈어요", "하나도 못 채웠어요", 1),  # 미션 판정 뒤집기
+        out.replace("아쉬웠어요", "모두 해냈어요", 1),
         out * 3,
         out + " ok",
         "",
