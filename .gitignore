@@ -41,3 +41,6 @@ pet_template/**/*_character.png
 
 # 도구 상태 (omc 등)
 .omc/
+
+# pet_template/export_palette.py 산출물 (FE 로 복사해 쓴다)
+pet_template/build/

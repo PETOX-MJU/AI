@@ -31,6 +31,20 @@
   - 역할의 기준색은 그 역할에서 픽셀 수가 가장 많은 색이다
   - 단색 견종(golden 등)은 `sub` 가 없다 — 밝은 크림 음영도 `main` 하이라이트로 묶인다
 
+## 앱(Kotlin) 이식
+
+앱은 FE `android/app/src/main/java/com/petoxmju/petox/pet/` 에서 같은 계산을 한다 (배경 제거는 ML Kit).
+이 디렉터리의 규칙·데이터를 바꾸면:
+
+```
+python export_palette.py   # build/pet_palette.json, build/pet_cases.json
+```
+
+- `pet_palette.json` → FE `android/app/src/main/assets/` (앱이 읽는 스와치·역할표·역할별 기준색)
+- `pet_cases.json` → FE `android/app/src/test/resources/` (Kotlin 이 Python 과 같은 값을 내는지 대조)
+
+역할별 기준색(픽셀 수 최다)은 여기 에셋 전체로 세야 해서 미리 계산해 넘긴다. FE PNG 는 에셋 일부라 앱에서 세면 달라질 수 있다.
+
 ## 사용
 
 ```
@@ -67,8 +81,9 @@ python test_reference.py
 | 역할표 커버리지 (5견종 전 에셋) | ✅ 테스트 |
 | 재색칠 명암 순서·음영 단계 유지·밝기 하한 | ✅ 테스트 |
 | 스와치 시트 눈 검수 | ✅ 2026-09-24, 5견종 × 7스와치 전수 확인 — golden 무채색 목표의 파란 색조 침범 발견 후 수정(커밋 679c34c) |
-| **실제 반려동물 사진 털색 추출** | ❌ **미검증** — 합성 이미지로만 확인 (`samples/testdog.png` 도 합성 도형) |
-| ML Kit 마스크와의 차이 | ❌ 미검증 |
+| 실제 반려동물 사진 털색 추출 | ⚠️ 2026-09-29, 풀밭 위 크림색 견 1장 — main cream·sub golden (gray 10% 는 흰 털 그늘). 흰 개·검은 개·실내 사진은 미검증 |
+| ML Kit 마스크와의 차이 | ✅ 2026-09-29, 같은 사진에서 BRIA·u2net·ML Kit 마스크 IoU 0.978~0.985, 털색 결과 동일. 앱은 ML Kit 을 쓴다 |
+| Kotlin 이식 (FE `pet/PetPalette.kt`) | ✅ `export_palette.py` 대조 사례(Lab 300, 치환표 320, 추출 21)와 전부 일치 |
 
 ### 알려진 한계
 

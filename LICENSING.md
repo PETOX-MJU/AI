@@ -29,7 +29,8 @@
 |---|---|---|
 | VARCO-VISION 2.0 | CC-BY-NC-4.0 (비상업) | `experiments/shorts_detection/` |
 | Qwen2.5-VL-7B-Instruct | Apache 2.0 | `experiments/pet_analysis_vlm/` |
-| rembg / U2-Net | MIT / Apache 2.0 | `pet_template/` 파라미터 튜닝 |
+| rembg + U2-Net | MIT / Apache 2.0 | `pet_template/` 파라미터 튜닝. `reference.py` 가 모델을 `u2net` 으로 명시한다 |
+| BRIA RMBG 2.0 (rembg 2.0.8x 의 **기본** 모델) | **CC BY-NC 4.0 — 비상업 전용** | 쓰지 않는다. rembg 를 모델 지정 없이 부르면 이것이 받아진다 (2026-09-29 확인) |
 
 `experiments/` 의 모델은 **제품에 탑재하지 않는다.** 성능 비교 기준선일 뿐이다.
 
