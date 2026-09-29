@@ -197,12 +197,13 @@ def remove_background(image: Image.Image | None) -> Image.Image | None:
     if image is None:
         return None
     try:
-        from rembg import remove
+        from rembg import new_session, remove
     except ImportError:
         print("[알림] rembg 미설치 — 배경 제거 불가, 원본색으로 진행합니다 (pip install rembg)")
         return None
     try:
-        return remove(image).convert("RGBA")
+        # 모델을 꼭 지정한다. rembg 2.0.8x 의 기본은 BRIA RMBG 2.0(비상업 전용 라이선스)이다
+        return remove(image, session=new_session("u2net")).convert("RGBA")
     except Exception as e:  # 모델 로드 실패 등 rembg 내부 오류도 원본색으로 진행한다
         print(f"[알림] 배경 제거 실패({e}) — 원본색으로 진행합니다")
         return None
