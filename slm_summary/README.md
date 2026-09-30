@@ -13,7 +13,7 @@
 > ```
 >
 > 검사 규칙을 바꾸면 `python export_cases.py`(먼저 「재현」의 `eval_ft.py gguf` 명령들로
-> `results/ft-v3-q4*_{A,B}.json`, `ft-v3b-q4*_A.json` 을 만들어 둬야 한다) 결과를 FE `__tests__/fixtures/slmCases.json` 으로 복사한다.
+> `results/ft-v4-q4*_{A,B}.json` 을 만들어 둬야 한다. 통과 사례에는 학습 정답(valid·test_b)도 쓴다) 결과를 FE `__tests__/fixtures/slmCases.json` 으로 복사한다.
 > v3 에서 미션 판정 검사(`bench.mission_claim_errors`)를 추가했다 — FE `slmCheck.ts` 에도 같은 규칙이 있어야 한다.
 > **v4 부터 모델 입력은 분석기 문장이 아니라 `insights[0].evidence` 의 수치 줄이다.** FE `toFact` 가 만들며,
 > 그 모양은 `data.py` 의 `fact_*` 와 글자 하나까지 같아야 한다 (`export_cases.py` 의 `facts` 로 jest 가 대조).

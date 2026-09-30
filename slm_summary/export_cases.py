@@ -15,9 +15,9 @@ from data import fill, marker_errors
 
 HERE = Path(__file__).resolve().parent
 # v3 출력 + v3b 출력(두 미션을 묶는 틀 때문에 "전부 성공"을 잘못 쓴 실제 사례가 있다)
-# 인자로 results/ 파일 이름을 주면 그것만 쓴다. 기본은 v4 온도 0.5·0 출력 + 정답(gold)만 —
-# 예전 버전(v3b 등) 출력은 사실이 분석기 문장 형식이라 v4 입력과 맞지 않는다
-SOURCES = sys.argv[1:] or ["ft-v4-q4_t0.5_A.json", "ft-v4-q4_t0.5_B.json", "ft-v4-q4_A.json", "gold-v4.json"]
+# 인자로 results/ 파일 이름을 주면 그것만 쓴다. 기본은 v4 온도 0.5·0 출력 —
+# 예전 버전(v3b 등) 출력은 사실이 분석기 문장 형식이라 v4 입력과 맞지 않는다. 학습 정답(gold)은 항상 더한다
+SOURCES = sys.argv[1:] or ["ft-v4-q4_t0.5_A.json", "ft-v4-q4_t0.5_B.json", "ft-v4-q4_A.json"]
 APPS = ["YouTube", "Instagram", "TikTok", "치지직", "아프리카TV", "유튜브", "네이버 웹툰", "TV", "X", "Bing", "KT", "앱9"]
 
 
@@ -105,6 +105,11 @@ def fact_cases() -> list[dict]:
 
 def main() -> None:
     rows = [r for name in SOURCES for r in json.loads((HERE / "results" / name).read_text())]
+    # 학습 정답은 검사를 통과한 문장이라 통과 사례를 넉넉하게 해 준다 (python data.py 가 만든 valid·test_b)
+    for name in ("valid", "test_b"):
+        for line in open(HERE / "data" / f"{name}.jsonl", encoding="utf-8"):
+            m = json.loads(line)["messages"]
+            rows.append({"fact": m[1]["content"].removeprefix("수치:\n"), "out": m[2]["content"], "fail": []})
     checks, seen = [], set()
     for r in rows:
         outs = [r["out"]] + (mutations(r["out"]) if not r["fail"] and len(seen) < 400 else [])
