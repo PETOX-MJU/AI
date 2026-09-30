@@ -1,4 +1,4 @@
-"""파인튜닝 모델 평가. 세트 A = 학습 전 비교에 쓴 사실 97개, B = 학습에 없던 극단값 200개.
+"""파인튜닝 모델 평가. 세트 A = 학습 전 비교에 쓴 97개(v4 는 수치 줄로 바꿔 적음), B = 학습에 없던 극단값 200개.
 
     python eval_ft.py mlx adapters-v2                 # 어댑터를 붙인 mlx 모델 (빠른 확인)
     python eval_ft.py gguf models/ft-v2-q4.gguf        # 폰 배포 형태 (llama-server)
@@ -15,7 +15,8 @@ import urllib.request
 from pathlib import Path
 
 import bench
-from data import APP, SYSTEM, fill, marker_errors, user_text
+import data
+from data import SYSTEM, fill, marker_errors, user_text
 
 HERE = Path(__file__).resolve().parent
 TEMP = float(next((a.split("=")[1] for a in sys.argv if a.startswith("--temp=")), 0))
@@ -23,13 +24,12 @@ SHOW_APPS = ["유튜브", "인스타그램", "틱톡", "치지직", "아프리�
 
 
 def cases() -> dict[str, list[tuple[str, str]]]:
-    """(모델에 넣을 사실, 보여 줄 앱 이름)."""
+    """(모델에 넣을 수치 줄, 보여 줄 앱 이름). 세트 A 는 v2·v3 와 같은 난수로 같은 수치를 만든다(data.scenario)."""
     rng = random.Random(7)
     a = []
-    for fact in (f for _ in range(40) for f in bench.scenario(rng)):
-        name = next((n for n in bench.APPS if f" {n}이고" in fact), SHOW_APPS[len(a) % len(SHOW_APPS)])
-        a.append((fact.replace(f" {name}이고", f" {APP}이고"), name))
-    b = [json.loads(line)["messages"][1]["content"].removeprefix("사실: ") for line in open(HERE / "data" / "test_b.jsonl")]
+    for fact, app in (f for _ in range(40) for f in data.scenario(rng)):
+        a.append((fact, app or SHOW_APPS[len(a) % len(SHOW_APPS)]))
+    b = [json.loads(line)["messages"][1]["content"].removeprefix("수치:\n") for line in open(HERE / "data" / "test_b.jsonl")]
     return {"A": a, "B": [(f, SHOW_APPS[i % len(SHOW_APPS)]) for i, f in enumerate(b)]}
 
 

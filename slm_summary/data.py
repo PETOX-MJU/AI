@@ -1,4 +1,7 @@
-"""파인튜닝 데이터. 사실 문장은 분석기 템플릿(Narratives.kt)과 같은 문구, 정답은 펫 말투 틀에 숫자를 코드로 넣는다.
+"""파인튜닝 데이터. 입력은 분석기 evidence 의 수치를 줄마다 하나씩 적은 것이고, 정답은 펫 말투 틀에 숫자를 코드로 넣는다.
+
+v4: 입력을 분석기 템플릿 문장이 아니라 수치 줄(`주간 감소량: 298분`)로 바꿨다. 정답 틀은 v3 그대로라서 입력 형식만의 효과를 볼 수 있다.
+계산은 여전히 분석기 몫이다 — 모델은 받은 수치를 옮기고 종류·방향 라벨에 맞는 말을 고른다.
 
 v2: 앱 이름은 모델에 넣지 않는다. 사실에는 `{앱}`, 정답에는 조사까지 표시한 `{앱:을}` 같은 자리표시를 쓰고
 생성 뒤 [fill] 이 실제 이름과 받침에 맞는 조사로 바꾼다. 처음 보는 앱 이름(치지직 → 치지icks)이 깨지던 문제를 없앤다.
@@ -12,7 +15,7 @@ import re
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SYSTEM = "주간 스크린타임 사실 하나를 펫 캐릭터의 다정한 존댓말 한 문장으로 바꿔라. 숫자와 {앱} 표시는 그대로 옮기고 사실에 없는 말은 하지 마라."
+SYSTEM = "주간 스크린타임 수치를 펫 캐릭터의 다정한 존댓말 한 문장으로 써라. 숫자와 {앱} 표시는 그대로 옮기고 수치에 없는 말은 하지 마라."
 APP = "{앱}"
 PURPOSES = ["학습", "업무", "여가", "연락", "기타"]
 
@@ -49,45 +52,44 @@ def a(josa: str = "") -> str:
     return "{앱:" + josa + "}" if josa else APP
 
 
-# ── 사실 문장 (분석기와 같은 문구) ──────────────────────────────────────────
+# ── 입력 수치 (분석기 evidence 를 줄마다 하나씩) ────────────────────────────
+# 라벨에 방향을 담는다(감소량·증가량). bench.meaning_errors 가 숫자가 붙은 줄의 라벨로 방향 말을 검사한다.
+# FE 의 toFact 가 같은 줄을 만든다 — 바꾸면 양쪽을 같이 고친다.
 
-def fact_decreased(lead: int, dropped: int, mean: int | None, pct: float | None) -> str:
-    text = f"지난주 선택한 앱 사용량은 하루 평균 {mean}분입니다. " if mean is not None else ""
-    text += ["그 전주보다", "전주 대비", "지난주와 견주면"][lead] + f" 주간 합계가 {dropped}분 줄었습니다."
+def fact_decreased(dropped: int, mean: int | None, pct: float | None) -> str:
+    lines = ["종류: 관리 앱 사용 감소"]
+    if mean is not None:
+        lines.append(f"하루 평균: {mean}분")
+    lines.append(f"주간 감소량: {dropped}분")
     if pct is not None:
-        text += f" 변화율은 {pct:.1f}%입니다."
-    return text
+        lines.append(f"감소율: {pct:.1f}%")
+    return "\n".join(lines)
 
 
-def fact_other(lead: int, other: int) -> str:
-    return (["선택한 앱은 줄었지만", "선택한 앱 사용은 감소했고", "선택한 앱 사용량은 줄었지만"][lead]
-            + f" 나머지 앱 사용이 {other}분 늘었습니다. 다른 앱 사용이 늘었다는 사실만 확인된 것이며 이유는 기록으로 알 수 없습니다.")
+def fact_other(other: int) -> str:
+    return f"종류: 관리 앱 감소, 다른 앱 증가\n다른 앱 증가량: {other}분"
 
 
-def fact_night(lead: int, mins: int, share: float | None, purpose: str | None) -> str:
-    text = ["야간 구간에서 가장 많이 사용한 앱은", "취침 전후로 가장 오래 사용한 앱은", "밤 시간대 사용이 가장 많았던 앱은"][lead]
-    text += f" {APP}이고 {mins}분입니다."
+def fact_night(mins: int, share: float | None, purpose: str | None) -> str:
+    lines = ["종류: 야간 최다 사용 앱", f"앱: {APP}", f"야간 사용: {mins}분"]
     if share is not None:
-        text += f" 야간 사용의 {share:.1f}%입니다."
+        lines.append(f"야간 비중: {share:.1f}%")
     if purpose:
-        text += f" 이 앱의 사용 목적은 '{purpose}'로 설정되어 있습니다."
-    return text
+        lines.append(f"사용 목적: {purpose}")
+    return "\n".join(lines)
 
 
 def mission_phrase(s: int, e: int) -> str:
     return "판정 가능한 미션 없음" if e == 0 else f"{e}개 중 {s}개 달성"
 
 
-def fact_missions(lead: int, ds: int, de: int, ns: int, ne: int) -> str:
-    tpl = ["이번 주 일일 미션은 {d}, 야간 미션은 {n}입니다.", "이번 주 판정 결과는 일일 {d}, 야간 {n}입니다.", "이번 주 성적은 일일 {d}, 야간 {n}입니다."][lead]
-    return tpl.format(d=mission_phrase(ds, de), n=mission_phrase(ns, ne))
+def fact_missions(ds: int, de: int, ns: int, ne: int) -> str:
+    return f"종류: 미션 결과\n일일 미션: {mission_phrase(ds, de)}\n야간 미션: {mission_phrase(ns, ne)}"
 
 
-def fact_insufficient(lead: int, days: int, nights: int, active: bool) -> str:
-    head = ["분석에 사용할 수 있는 날은", "이번 주 확인된 날은", "복원에 성공한 날은"][lead]
-    tail = ("7개가 모이지 않아 이번 주 성과로는 다음 목표를 계산하지 않습니다. 현재 목표는 그대로 유지됩니다." if active
-            else "각각 7개가 모여야 개인 기준선을 계산합니다. 그때까지는 처음 입력한 임시 목표를 사용합니다.")
-    return f"{head} {days}일, 야간 구간은 {nights}개입니다. {tail}"
+def fact_insufficient(days: int, nights: int, active: bool) -> str:
+    goal = "기존 목표 유지" if active else "임시 목표 사용"
+    return f"종류: 기록 부족\n확인된 날: {days}일\n확인된 야간 구간: {nights}개\n필요한 기록: 각각 7개\n목표: {goal}"
 
 
 # ── 정답 (펫 말투). 숫자는 코드가 넣는다 ─────────────────────────────────────
@@ -210,21 +212,20 @@ def minutes(rng: random.Random, extreme: bool) -> int:
 
 
 def sample(rng: random.Random, extreme: bool = False) -> tuple[str, str]:
-    lead = rng.randrange(3)
     kind = rng.choice(["decreased", "other", "night", "missions", "insufficient"])
     if kind == "decreased":
         dropped = minutes(rng, extreme)
         mean = rng.randint(1, 600) if rng.random() < 0.7 else None
         pct = rng.uniform(0.1, 95) if rng.random() < 0.85 else None
-        return fact_decreased(lead, dropped, mean, pct), target_decreased(rng, dropped, mean, pct)
+        return fact_decreased(dropped, mean, pct), target_decreased(rng, dropped, mean, pct)
     if kind == "other":
         other = minutes(rng, extreme)
-        return fact_other(lead, other), target_other(rng, other)
+        return fact_other(other), target_other(rng, other)
     if kind == "night":
         mins = minutes(rng, extreme)
         share = rng.uniform(1, 100) if rng.random() < 0.9 else None
         purpose = rng.choice(PURPOSES) if rng.random() < 0.3 else None
-        return fact_night(lead, mins, share, purpose), target_night(rng, mins, share, purpose)
+        return fact_night(mins, share, purpose), target_night(rng, mins, share, purpose)
     if kind == "missions":
         de, ne = rng.randint(0, 7), rng.randint(0, 7)
         if de == ne == 0:
@@ -234,13 +235,42 @@ def sample(rng: random.Random, extreme: bool = False) -> tuple[str, str]:
         r = rng.random()
         ds = de if r < 0.2 else 0 if r < 0.35 else rng.randint(0, de)
         ns = ne if r < 0.2 else 0 if r < 0.35 else rng.randint(0, ne)
-        return fact_missions(lead, ds, de, ns, ne), target_missions(rng, ds, de, ns, ne)
+        return fact_missions(ds, de, ns, ne), target_missions(rng, ds, de, ns, ne)
     days, nights, active = rng.randint(0, 6), rng.randint(0, 6), rng.random() < 0.5
-    return fact_insufficient(lead, days, nights, active), target_insufficient(rng, days, nights, active)
+    return fact_insufficient(days, nights, active), target_insufficient(rng, days, nights, active)
+
+
+def scenario(rng: random.Random) -> list[tuple[str, str | None]]:
+    """세트 A 용 한 주 분량. bench.scenario(v2·v3 평가 세트)와 난수를 같은 순서로 뽑아 같은 수치를 만들고,
+    사실만 수치 줄로 적는다 — 학습 입력 형식이 바뀐 것 말고는 v2·v3 결과와 같은 조건으로 잴 수 있다.
+    (사실, 앱 이름 또는 None)"""
+    apps = ["인스타그램", "유튜브", "틱톡"]  # bench.APPS
+    facts: list[tuple[str, str | None]] = []
+    rng.randrange(3)  # bench.scenario 의 lead — 난수 순서를 맞추려고 뽑기만 한다
+    if rng.random() < 0.25:
+        days, nights = rng.randint(0, 6), rng.randint(0, 6)
+        facts.append((fact_insufficient(days, nights, rng.random() < 0.5), None))
+    else:
+        if rng.random() < 0.7:
+            dropped, mean = rng.randint(5, 400), rng.randint(20, 240)
+            pct = dropped / (mean * 7 + dropped) * 100
+            facts.append((fact_decreased(dropped, mean, pct), None))
+            if rng.random() < 0.4:
+                facts.append((fact_other(rng.randint(5, 300)), None))
+        if rng.random() < 0.9:
+            app, mins, share = rng.choice(apps), rng.randint(3, 300), rng.uniform(20, 100)
+            purpose = rng.choice(PURPOSES) if rng.random() < 0.3 else None
+            facts.append((fact_night(mins, share, purpose), app))
+    if rng.random() < 0.8:
+        de, ne = rng.randint(0, 7), rng.randint(0, 7)
+        ds, ns = rng.randint(0, de), rng.randint(0, ne)
+        if de or ne:
+            facts.append((fact_missions(ds, de, ns, ne), None))
+    return facts or [(fact_insufficient(0, 0, False), None)]
 
 
 def user_text(fact: str) -> str:
-    return f"사실: {fact}"
+    return f"수치:\n{fact}"
 
 
 def marker_errors(fact: str, out: str) -> list[str]:
@@ -264,7 +294,7 @@ def to_chat(fact: str, target: str) -> dict:
 def main() -> None:
     import bench  # 정답도 같은 검사를 통과해야 한다
 
-    rng = random.Random(3002)  # v3
+    rng = random.Random(4001)  # v4
     out = HERE / "data"
     out.mkdir(exist_ok=True)
     for name, n, extreme in (("train", 3000, False), ("valid", 150, False), ("test_b", 200, True)):

@@ -118,13 +118,18 @@ def meaning_errors(facts: list[str], out: str) -> list[str]:
     for e, s_ in re.findall(r"(?<![\d.])(\d+)개 중 (\d+)개", body):
         if not at(f"{e}개 중 {s_}개"):
             errs.append(f"{e}개 중 {s_}개 없음")
+    def label_of(hit: re.Match) -> str:
+        """숫자가 적힌 줄 전체. 수치 줄의 라벨(주간 감소량·다른 앱 증가량)이 그 숫자의 방향이다."""
+        start, end = fact.rfind("\n", 0, hit.start()) + 1, fact.find("\n", hit.end())
+        return fact[start:] if end == -1 else fact[start:end]
+
     for m in re.finditer(r"(?<![\d.])(\d+(?:\.\d+)?)(분|%)?[^,.]{0,12}?(늘|증가|많아)", body):
         hit = at(f"{m.group(1)}{m.group(2) or ''}")
-        if hit and "늘었" not in fact[hit.end():hit.end() + 40]:
+        if hit and not re.search(r"증가", label_of(hit)):
             errs.append(f"{m.group(1)} 방향(늘) 틀림")
     for m in re.finditer(r"(?<![\d.])(\d+(?:\.\d+)?)(분|%)?[^,.]{0,12}?(줄|감소)", body):
         hit = at(f"{m.group(1)}{m.group(2) or ''}")
-        if hit and not re.search(r"줄었|변화율", fact[max(0, hit.start() - 25):hit.end() + 25]):
+        if hit and not re.search(r"감소", label_of(hit)):
             errs.append(f"{m.group(1)} 방향(줄) 틀림")
     if re.search(r"모두 (달성|완료)|다 달성", body) and not any(a == b for a, b in re.findall(r"(\d+)개 중 (\d+)개", fact)):
         errs.append("모두 달성 아님")
@@ -139,7 +144,7 @@ NONE_CLAIM = re.compile(r"하나도 못|못 채웠|모두 아쉬웠")
 def mission_claim_errors(fact: str, body: str) -> list[str]:
     """절마다 "모두 해냈다"·"하나도 못했다" 같은 판정 말이 사실과 맞는지 본다.
     v3 첫 학습이 일일 1개 중 0개·야간 3개 중 3개를 "하나도 못 채웠지만"으로 쓴 것을 숫자 검사로는 못 잡았다."""
-    pairs = {kind: (int(e), int(s)) for kind, e, s in re.findall(r"(일일|야간) (?:미션은 )?(\d+)개 중 (\d+)개", fact)}
+    pairs = {kind: (int(e), int(s)) for kind, e, s in re.findall(r"(일일|야간) (?:미션(?:은|:) )?(\d+)개 중 (\d+)개", fact)}
     errs, pending = [], ""
     for part in re.split(r"[,.!]", body):
         # 서술어 없는 쉼표 조각("일일 3개, 야간 3개 미션을 …")은 뒤 조각과 한 절이다
