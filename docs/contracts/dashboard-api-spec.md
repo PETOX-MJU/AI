@@ -197,7 +197,7 @@ mock은 §1의 예제 JSON(golden)을 그대로 쓴다.
 - 카드 제목 권장안: `이번 주 한줄 요약` 또는 `이번 주 사용 패턴`.
 - 문장은 서버나 생성형 LLM이 아니라 Kotlin 분석 결과에 기반한 결정론적 template이다. 분석기(`kotlin_port`)는
   항상 template만 만들고 생성형 AI를 호출하지 않는다.
-- FE는 이 template 문장을 온디바이스 SLM(`slm.ts`)으로 반려동물 말투로 다시 쓸 수 있다. 검사(`slmCheck.ts`)를
+- FE는 `insights[0]` 의 `code`·`evidence` 수치를 온디바이스 SLM(`slm.ts`)에 주고 반려동물 말투 한 문장으로 쓰게 할 수 있다(입력은 문장이 아니라 수치 줄 — `slmCheck.ts toFact`, AI 저장소 `slm_summary/README.md` v4). 검사(`slmCheck.ts`)를
   모두 통과했을 때만 교체하고, 하나라도 실패하면 template 문장을 그대로 보여준다. 분석기 출력의 `source`는
   이 경우에도 항상 `template`이다. 시연에는 "AI" 표시가 없다. 출시 때는 AI 표시와 사전 고지(인공지능기본법
   제31조)가 필요하다 — `docs/superpowers/specs/2026-09-25-slm-summary-app-design.md`의 「결정」 참고.
@@ -213,7 +213,9 @@ mock은 §1의 예제 JSON(golden)을 그대로 쓴다.
 - `source`는 항상 `template`이다(분석기는 생성형 AI를 호출하지 않는다). FE가 SLM 검사 통과 시
   화면 문장만 pet 말투로 바꿔 보여줄 수 있으나, 사용자에게 `AI 생성` 배지를 붙이지 않는다(시연 기준;
   출시 때 표시 요건은 위 4.6 참고).
-- `evidence`는 QA·accessibility 설명 연결용이다. 사용자에게 raw JSON을 노출하지 않는다.
+- `evidence`는 QA·accessibility 설명 연결용이며 FE의 SLM 입력 수치 원천이기도 하다. 사용자에게 raw JSON을 노출하지 않는다.
+  SLM 입력 줄의 숫자가 `text` 의 숫자와 다르면(반올림 차이) FE는 SLM을 부르지 않고 `text` 를 그대로 쓴다.
+  `NIGHT_TOP_APP` 의 사용 목적은 evidence 에 없고 `text` 에만 있다(필요하면 evidence 에 `purpose` 추가).
 - 가능한 `code`:
   - `SELECTED_USAGE_DECREASED`
   - `OTHER_APPS_INCREASED`
