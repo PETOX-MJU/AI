@@ -2,30 +2,34 @@
 
 대시보드 한줄 요약을 템플릿 대신 폰에서 도는 작은 언어 모델(SLM)로 만드는 실험.
 **Qwen3.5 0.8B 를 LoRA 로 파인튜닝해 4비트 GGUF(약 540MB)로 배포**하는 것이 현재 후보다.
-모델 파일(`models/ft-v3-q4.gguf`, 이전 `ft-v2-q4.gguf`)은 저장소에 넣지 않고 팀 구글 드라이브에 둔다.
+모델 파일(`models/ft-v4-q4.gguf`)은 저장소에 넣지 않는다. 올려 둔 것은 [Releases `slm-summary-v2`](https://github.com/PETOX-MJU/AI/releases/tag/slm-summary-v2)(`gh release download slm-summary-v2 --repo PETOX-MJU/AI`)뿐이고, v3·v4 는 아직 올리지 않았다(아래 「재현」으로 만든다).
 
-> **앱 연결(시연):** FE `feat/slm-summary` 가 대시보드 한줄 요약(`insights[0]`)을 이 모델로 바꿔 쓴다. 분석기 출력 계약은 그대로
+> **앱 연결(시연):** FE `feat/slm-summary`(+ v4 입력은 `feat/slm-structured`)가 대시보드 한줄 요약(`insights[0]`)을 이 모델로 바꿔 쓴다. 분석기 출력 계약은 그대로
 > (`source: "template"`)이고, 검사에 실패하거나 모델이 없으면 템플릿 문장을 쓴다. 모델은 디버그 빌드에 adb 로 넣는다:
 >
 > ```bash
-> adb push models/ft-v3-q4.gguf /data/local/tmp/
-> adb shell "cat /data/local/tmp/ft-v3-q4.gguf | run-as com.petoxmju.petox sh -c 'mkdir -p files && cat > files/ft-v3-q4.gguf'"
+> adb push models/ft-v4-q4.gguf /data/local/tmp/
+> adb shell "cat /data/local/tmp/ft-v4-q4.gguf | run-as com.petoxmju.petox sh -c 'mkdir -p files && cat > files/ft-v4-q4.gguf'"
 > ```
 >
 > 검사 규칙을 바꾸면 `python export_cases.py`(먼저 「재현」의 `eval_ft.py gguf` 명령들로
 > `results/ft-v3-q4*_{A,B}.json`, `ft-v3b-q4*_A.json` 을 만들어 둬야 한다) 결과를 FE `__tests__/fixtures/slmCases.json` 으로 복사한다.
 > v3 에서 미션 판정 검사(`bench.mission_claim_errors`)를 추가했다 — FE `slmCheck.ts` 에도 같은 규칙이 있어야 한다.
+> **v4 부터 모델 입력은 분석기 문장이 아니라 `insights[0].evidence` 의 수치 줄이다.** FE `toFact` 가 만들며,
+> 그 모양은 `data.py` 의 `fact_*` 와 글자 하나까지 같아야 한다 (`export_cases.py` 의 `facts` 로 jest 가 대조).
 
 ## 설계
 
-- **모델에게는 사실 하나만 준다.** 분석기 템플릿 문장(`Narratives.kt`) 하나를 펫 말투 한 문장으로 바꾸는 일만 한다.
-  사실 2~4개를 한 번에 주면 2B 모델도 숫자를 엉뚱한 사실에 붙였다(아래 「모델 선택」).
+- **모델에게는 사실 하나만 준다.** v4 부터는 분석기 템플릿 문장이 아니라 그 사실의 수치를 줄마다 하나씩 준다
+  (`종류: 관리 앱 사용 감소` / `주간 감소량: 298분` / `감소율: 27.7%` …). 방향은 라벨(감소량·증가량)에 담겨 있고,
+  모델은 종류에 맞는 말을 고르고 수치를 옮긴다. 사실 2~4개를 한 번에 주면 2B 모델도 숫자를 엉뚱한 사실에 붙였다(아래 「모델 선택」).
 - **앱 이름은 모델에 넣지 않는다.** 사실에는 `{앱}`, 출력에는 `{앱:을}` 같은 자리표시를 쓰고
   `data.fill()` 이 실제 이름과 받침에 맞는 조사로 바꾼다. 처음 보는 이름이 깨지는 일이 없다.
-- **숫자·계산은 여전히 분석기가 한다.** 모델은 사실의 숫자를 옮기기만 한다.
+- **숫자·계산은 여전히 분석기가 한다.** 모델은 수치를 옮기기만 한다. FE `toFact` 는 evidence(ms)를 분으로 바꾼 값이
+  분석기 문장에 나온 숫자와 다르면(반올림 차이) 입력을 만들지 않고 템플릿 문장을 그대로 쓴다.
 - **출력은 검사하고, 실패하면 템플릿 문장을 그대로 쓴다.** 앱에 넣을 검사:
   - 숫자: 출력의 모든 숫자(단위 포함)가 사실에 있다 (`bench.meaning_errors`)
-  - 방향: 줄어든 값을 "늘었다"로 쓰지 않는다
+  - 방향: 숫자가 적힌 줄의 라벨이 감소량이면 "늘었다"로, 증가량이면 "줄었다"로 쓰지 않는다
   - 미션 판정: 절마다 "모두 해냈다·전부 성공"은 그 미션이 정말 전부 달성일 때만, "하나도 못·아쉬웠다"는 0개일 때만
     (`bench.mission_claim_errors`). 숫자가 전부 사실에 있어도 판정 말이 뒤집힐 수 있어서 따로 본다
   - 형식: 한 문장, 90자 이하, 한자·가나·사실에 없는 로마자 없음, 금지어 없음 (`bench.check`)
@@ -36,9 +40,9 @@
 | 파일 | 하는 일 |
 |---|---|
 | `bench.py` | 학습 전 모델 4종 비교(사실 여러 개 / 하나씩). 자동 검사 함수 `check`, `meaning_errors` |
-| `data.py` | 학습 데이터 생성. 사실은 분석기와 같은 문구, 정답은 펫 말투 틀에 숫자를 코드로 넣는다. `fill` 도 여기 있다 |
+| `data.py` | 학습 데이터 생성. 입력은 evidence 수치 줄(`fact_*`), 정답은 펫 말투 틀에 숫자를 코드로 넣는다. `fill`·세트 A 용 `scenario` 도 여기 있다 |
 | `merge_hf.py` | LoRA 로 바뀐 선형 가중치만 원본 HF 체크포인트에 갈아 끼운다 (GGUF 변환용) |
-| `eval_ft.py` | 파인튜닝 모델 평가. 세트 A(학습 전 비교에 쓴 사실 97개), B(학습에 없던 극단값 200개) |
+| `eval_ft.py` | 파인튜닝 모델 평가. 세트 A(학습 전 비교에 쓴 97개, v4 는 수치 줄로 바꿔 적음), B(학습에 없던 극단값 200개) |
 
 모델·데이터·결과 파일은 커밋하지 않는다(`.gitignore`). 아래 절차로 다시 만든다.
 
@@ -53,18 +57,18 @@ brew install llama.cpp
 python data.py                                     # data/train.jsonl 3000, valid 150, test_b 200
 .venv/bin/python -m mlx_lm lora --model base --train --data data --mask-prompt --num-layers -1 \
   --batch-size 4 --iters 1500 --learning-rate 1e-4 --max-seq-length 256 --grad-checkpoint \
-  --save-every 250 --adapter-path adapters-v3 --seed 0   # M3 Pro 약 1시간 50분. 메모리가 빠듯하면 스왑으로 멈춘다
-# Metal "GPU Hang" 으로 죽으면 마지막 체크포인트에서 이어 간다: --resume-adapter-file adapters-v3/0001000_adapters.safetensors
+  --save-every 250 --adapter-path adapters-v4 --seed 0   # M3 Pro 약 1시간 50분. 메모리가 빠듯하면 스왑으로 멈춘다
+# Metal "GPU Hang" 으로 죽으면 마지막 체크포인트에서 이어 간다: --resume-adapter-file adapters-v4/0000400_adapters.safetensors --iters <남은 스텝> --adapter-path adapters-v4r
 
 # GGUF 변환 (llama.cpp 저장소의 변환기. torch·gguf 가 든 별도 venv)
-.venv/bin/python -m mlx_lm fuse --model base --adapter-path adapters-v3 --save-path fused
-.venv/bin/python merge_hf.py adapters-v3           # fused/ 를 통째로 쓰지 않는 이유는 파일 머리말 참고
+.venv/bin/python -m mlx_lm fuse --model base --adapter-path adapters-v4 --save-path fused
+.venv/bin/python merge_hf.py adapters-v4           # fused/ 를 통째로 쓰지 않는 이유는 파일 머리말 참고
 git clone --depth 1 https://github.com/ggml-org/llama.cpp llama.cpp-src
-.conv/bin/python llama.cpp-src/convert_hf_to_gguf.py ft-hf --outfile models/ft-v3-f16.gguf --outtype f16
-llama-quantize models/ft-v3-f16.gguf models/ft-v3-q4.gguf Q4_K_M
+.conv/bin/python llama.cpp-src/convert_hf_to_gguf.py ft-hf --outfile models/ft-v4-f16.gguf --outtype f16
+llama-quantize models/ft-v4-f16.gguf models/ft-v4-q4.gguf Q4_K_M
 
-python eval_ft.py gguf models/ft-v3-q4.gguf                # 온도 0
-python eval_ft.py gguf models/ft-v3-q4.gguf --temp=0.5     # 요청마다 시드를 바꿔 다양성까지
+python eval_ft.py gguf models/ft-v4-q4.gguf                # 온도 0
+python eval_ft.py gguf models/ft-v4-q4.gguf --temp=0.5     # 요청마다 시드를 바꿔 다양성까지
 ```
 
 ## 모델 선택 (학습 전, 2026-09-24)
@@ -144,8 +148,40 @@ v2 대비 바꾼 것: "밤 시간의" → "밤 사용의", 용도로 시작하�
   "…아쉬웠어요, …아쉬웠어요" 처럼 같은 말이 두 번 나온다.
 - v3a 학습은 1130스텝에서 Metal GPU Hang 으로 죽었다. `--save-every 250` 으로 두고, 죽으면 체크포인트에서 이어 간다.
 
+### v4 (2026-10-01) — 입력을 분석기 문장에서 evidence 수치 줄로
+
+v3 대비 바꾼 것은 **입력 형식 하나**다. 정답 문장 틀은 v3 그대로다(그래서 문장 다양성은 v3 와 같다).
+입력은 `insights[0].evidence` 의 수치를 줄마다 하나씩 적은 것이고 시스템 프롬프트도 "사실 하나를 바꿔라" 대신 "수치를 써라"로 바꿨다:
+
+```
+수치:
+종류: 관리 앱 사용 감소
+하루 평균: 38분
+주간 감소량: 29분
+감소율: 9.8%
+```
+
+방향은 숫자가 적힌 줄의 라벨(감소량·증가량)로 검사한다. 학습 3000개·1500스텝(450스텝쯤에서 Metal GPU 오류로 죽어 400스텝 체크포인트에서
+이어 학습, 검증 손실 0.091). 4비트 541MB, 맥 CPU 4스레드 85~86 tok/s. 세트 A 는 v2·v3 와 같은 97개(같은 수치, 수치 줄로만 적음).
+
+| | v3 (온도 0) | v4 (온도 0) | v3 (온도 0.5) | v4 (온도 0.5) |
+|---|---|---|---|---|
+| 세트 A 자동 검사 통과 | 97/97 | 97/97 | 97/97 | 97/97 |
+| 세트 A 뜻 틀림 (사람 채점) | — | — | 0/97 | **0/97** |
+| 세트 A 서로 다른 문장 틀 | 26 | 25 | 44 | 45 |
+| 세트 B 자동 검사 통과 | 200/200 | 200/200 | 198/200 | 199/200 |
+
+결론: **수치 줄만 받아도 0.8B 는 v3 와 같은 품질**이었다. 숫자·방향·미션 판정·목표 유지/임시 구분이 모두 맞았다.
+다만 이 결과는 "수치 → 학습한 틀 중 하나"의 능력이지, 새로운 표현을 만드는 능력이 아니다 — 출력은 정답 틀 수(약 60개)를 못 넘는다.
+
+세트 B 실패 1건: 입력에 `하루 평균` 줄이 없는데 "지난주 하루 평균은 3331분이고"라고 지어냈다(숫자 검사가 잡는다).
+선택 줄이 빠진 입력에서 그 줄이 있는 틀을 쓰는 실수다 — 문장 입력 때도 같은 종류의 실패가 있었다.
+
+**FE 쪽:** 사용 목적은 evidence 에 없고 분석기 문장에만 있어서 `toFact` 가 문장에서 뽑는다(분석기 evidence 에 `purpose` 를 넣으면 깔끔하다).
+
 ## 알려진 한계
 
-- 정답 문장 틀은 사람이 쓴 것이라, 다양성은 학습한 틀 수를 넘지 않는다. 더 다양하게 하려면 틀을 늘린다.
+- 정답 문장 틀은 사람이 쓴 것이라, 다양성은 학습한 틀 수를 넘지 않는다. 더 다양하게 하려면 틀을 늘린다(입력 형식을 바꾼다고 늘지 않는다 — v4).
+- 여러 사실을 엮어 한 줄로 요약하는 것은 시험하지 않았다. 지금은 `insights[0]` 하나만 쓴다.
 - 속도는 맥 CPU 기준이다. 실제 폰에서는 몇 배 느리다. 한 줄(수십 토큰)이라 주 1회 생성에는 문제없을 것으로 보지만 실측이 필요하다.
 - 입력은 분석기 문장뿐이라 앱 이름·화면 내용 같은 개인정보가 모델에 들어가지 않는다.
