@@ -36,6 +36,8 @@ def mutations(out: str) -> list[str]:
         out.replace("요", "요 모두 달성", 1),
         out * 3,
         out + " ok",
+        "지난주 하루 평균 10분이었어요.",
+        "하루에 평균 " + out,
         "",
     ]
     if first:

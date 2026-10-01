@@ -128,6 +128,8 @@ def meaning_errors(facts: list[str], out: str) -> list[str]:
             errs.append(f"{m.group(1)} 방향(줄) 틀림")
     if re.search(r"모두 (달성|완료)|다 달성", body) and not any(a == b for a, b in re.findall(r"(\d+)개 중 (\d+)개", fact)):
         errs.append("모두 달성 아님")
+    if re.search(r"하루\s*(에\s*)?평균", body) and not re.search(r"하루\s*(에\s*)?평균", fact):
+        errs.append("하루 평균 없음")
     return errs
 
 
