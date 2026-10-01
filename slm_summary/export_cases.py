@@ -8,7 +8,9 @@ import re
 from pathlib import Path
 
 import bench
-from data import fill, marker_errors
+import random
+
+from data import fill, marker_errors, sample
 
 HERE = Path(__file__).resolve().parent
 SOURCES = ["ft-v2-q4_t0.5_A.json", "ft-v2-q4_t0.5_B.json", "ft-v2-q4_A.json"]
@@ -41,8 +43,21 @@ def mutations(out: str) -> list[str]:
     return [m for m in muts if m != out]
 
 
+def load_rows() -> list[dict]:
+    """eval 결과(results/*.json, 커밋 안 함)가 있으면 모델 출력 그대로, 없으면 학습 정답 문장(data.sample)으로 대신한다."""
+    found = [HERE / "results" / n for n in SOURCES if (HERE / "results" / n).exists()]
+    if found:
+        return [r for path in found for r in json.loads(path.read_text())]
+    rng = random.Random(11)
+    rows = []
+    for i in range(300):
+        fact, target = sample(rng, extreme=i % 3 == 0)
+        rows.append({"fact": fact, "out": target, "fail": fail(fact, target)})
+    return rows
+
+
 def main() -> None:
-    rows = [r for name in SOURCES for r in json.loads((HERE / "results" / name).read_text())]
+    rows = load_rows()
     checks, seen = [], set()
     for r in rows:
         outs = [r["out"]] + (mutations(r["out"]) if not r["fail"] and len(seen) < 400 else [])
@@ -51,7 +66,7 @@ def main() -> None:
                 seen.add((r["fact"], out))
                 checks.append({"fact": r["fact"], "out": out, "fail": fail(r["fact"], out)})
     fills = [{"out": r["out"], "app": app, "shown": fill(r["out"], app)}
-             for r in rows[:60] for app in APPS if "{앱" in r["out"]]
+             for r in rows[:200] for app in APPS if "{앱" in r["out"]]
     path = HERE / "results" / "slmCases.json"
     path.write_text(json.dumps({"checks": checks, "fills": fills}, ensure_ascii=False, indent=1))
     bad = sum(bool(c["fail"]) for c in checks)
